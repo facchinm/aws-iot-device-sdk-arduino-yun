@@ -19,8 +19,7 @@ import AWSIoTCommand
 
 
 class commandSetBackoffTiming(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.setBackoffTime(srcBaseReconnectTimeSecond, srcMaximumReconnectTimeSecond, srcMinimumConnectTimeSecond)
-    _mqttCoreHandler = None
+    # Target API: AWSIoTMQTTClient.configureAutoReconnectBackoffTime(baseReconnectQuietTimeSecond, maxReconnectQuietTimeSecond, stableConnectionTimeSecond)
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
         self._commandProtocolName = "bf"
@@ -39,7 +38,7 @@ class commandSetBackoffTiming(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "BF1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.setBackoffTime(int(self._parameterList[0]), int(self._parameterList[1]), int(self._parameterList[2]))
+                self._mqttCoreHandler.configureAutoReconnectBackoffTime(int(self._parameterList[0]), int(self._parameterList[1]), int(self._parameterList[2]))
             except TypeError as e:
                 returnMessage = "BF2F: " + str(e.message)
             except ValueError as e:

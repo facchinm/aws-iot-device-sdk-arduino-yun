@@ -16,40 +16,36 @@
  '''
 
 import sys
-sys.path.append("../lib/util/")
-sys.path.append("../lib/exception/")
+sys.path.insert(0, "../lib/util/")
+sys.path.insert(0, "../lib/exception/")
 import communicationServer
 import AWSIoTExceptions
 import Queue
 import signal
+import logging
 
 
 class serialCommunicationServer(communicationServer.communicationServer):
-    _protocolMessageQueue = None
-    _yieldMessageQueue = None
-    _jsonBuf = None
-    _txBuf = None
-    _log = None
-    _acceptTimeout = 0  # Never timeout
-    _chunkSize = 50  # Biggest chunk of data that can be sent over serial
-    _returnList = []
-    _currentElementOut = ""  # Retained message that needs to be sent out in chunks
-    _lockedQueueSize = 0  # Number of messages to be transmitted in this yield
 
-    def __init__(self, srcLogManager):
-        self._log = srcLogManager
+    def __init__(self):
+        self._log = logging.getLogger(__name__)
         self._protocolMessageQueue = Queue.Queue(0)
         self._yieldMessageQueue = Queue.Queue(0)
         self._jsonBuf = ""
         self._txBuf = ""
+        self._acceptTimeout = 0  # Never timeout
+        self._chunkSize = 50  # Biggest chunk of data that can be sent over serial1
+        self._returnList = []
+        self._currentElementOut = ""  # Retained message that needs to be sent out in chunks
+        self._lockedQueueSize = 0  # Number of messages to be transmitted in this yield
         # Register timeout signal handler
         signal.signal(signal.SIGALRM, self._timeoutHandler)
         signal.alarm(0)  # disable SIGALRM
-        self._log.writeLog("Register timeout signal handler.")
-        self._log.writeLog("serialCommunicationServer init.")
+        self._log.debug("Register timeout signal handler.")
+        self._log.debug("serialCommunicationServer init.")
 
     def _timeoutHandler(self, signal, frame):
-        self._log.writeLog("Raise a custom exception for accept timeout.")
+        self._log.debug("Raise a custom exception for accept timeout.")
         raise AWSIoTExceptions.acceptTimeoutException()
 
     def _basicInput(self):
@@ -60,23 +56,20 @@ class serialCommunicationServer(communicationServer.communicationServer):
 
     def setAcceptTimeout(self, srcTimeout):
         self._acceptTimeout = srcTimeout
-        self._log.writeLog("serialCommunicationServer set accept timeout to " + str(self._acceptTimeout))
+        self._log.debug("serialCommunicationServer set accept timeout to " + str(self._acceptTimeout))
 
     def getChunkSize(self):
         return self._chunkSize
 
     def setChunkSize(self, srcChunkSize):
         self._chunkSize = srcChunkSize
-        self._log.writeLog("serialCommunicationServer set chunk size to " + str(self._chunkSize))
+        self._log.debug("serialCommunicationServer set chunk size to " + str(self._chunkSize))
 
     def updateLockedQueueSize(self):
         self._lockedQueueSize = self._yieldMessageQueue.qsize()
 
     def getLockedQueueSize(self):
         return self._lockedQueueSize
-
-    #def endOfThisYield(self):
-    #    return self._lockedQueueSize == 0 and self._currentElementOut == ""
 
     def accept(self):
         # Messages are passed from remote client to server line by line
@@ -86,32 +79,32 @@ class serialCommunicationServer(communicationServer.communicationServer):
         # Throw acceptTimeoutException, ValueError
         # Store the incoming parameters into an internal data structure
         self._returnList = []
-        self._log.writeLog("Clear internal list. Size: " + str(len(self._returnList)))
+        self._log.debug("Clear internal list. Size: " + str(len(self._returnList)))
         signal.alarm(self._acceptTimeout)  # Enable SIGALRM
-        self._log.writeLog("Accept-timer starts, with acceptTimeout: " + str(self._acceptTimeout) + " second(s).")
+        self._log.debug("Accept-timer starts, with acceptTimeout: " + str(self._acceptTimeout) + " second(s).")
         numLines = int(self._basicInput())  # Get number of lines to receive
-        self._log.writeLog(str(numLines) + " lines to be received. Loop begins.")
+        self._log.debug(str(numLines) + " lines to be received. Loop begins.")
         loopCount = 1
         while(loopCount <= numLines):
             currElementIn = self._basicInput()
             self._returnList.append(currElementIn)
-            self._log.writeLog("Received: " + str(loopCount) + "/" + str(numLines) + " Message is: " + currElementIn)
+            self._log.debug("Received: " + str(loopCount) + "/" + str(numLines) + " Message is: " + currElementIn)
             loopCount += 1
         signal.alarm(0)  # Finish reading from remote client, disable SIGALRM
-        self._log.writeLog("Finish reading from remote client. Accept-timer ends.")
+        self._log.debug("Finish reading from remote client. Accept-timer ends.")
         return self._returnList
 
     def writeToInternalProtocol(self, srcContent):
         self._protocolMessageQueue.put(srcContent)
-        self._log.writeLog("Updated serialCommunicationServer internal protocolMessageQueue by inserting a new message. Size: " + str(self._protocolMessageQueue.qsize()))
+        self._log.debug("Updated serialCommunicationServer internal protocolMessageQueue by inserting a new message. Size: " + str(self._protocolMessageQueue.qsize()))
 
     def writeToInternalYield(self, srcContent):
         self._yieldMessageQueue.put(srcContent)
-        self._log.writeLog("Updated serialCommunicationServer internal yieldMessageQueue by inserting a new message. Size: " + str(self._yieldMessageQueue.qsize()))
+        self._log.debug("Updated serialCommunicationServer internal yieldMessageQueue by inserting a new message. Size: " + str(self._yieldMessageQueue.qsize()))
 
     def writeToInternalJSON(self, srcContent):
         self._jsonBuf = srcContent
-        self._log.writeLog("Updated serialCommunicationServer internal json buffer with a new JSON payload of size: " + str(len(self._jsonBuf)))
+        self._log.debug("Updated serialCommunicationServer internal json buffer with a new JSON payload of size: " + str(len(self._jsonBuf)))
 
     def writeToExternalYield(self):
         # Write ONE chunk to the remote client
@@ -121,23 +114,23 @@ class serialCommunicationServer(communicationServer.communicationServer):
             if self._currentElementOut == "":  # No more chunks left for current retained?
                 self._currentElementOut = self._yieldMessageQueue.get()
                 self._lockedQueueSize -= 1
-                self._log.writeLog("Start sending a new message to remote client: " + self._currentElementOut)
+                self._log.debug("Start sending a new message to remote client: " + self._currentElementOut)
             self._txBuf = self._currentElementOut[0:self._chunkSize]
             self._basicOutput(self._txBuf)
-            self._log.writeLog("Send through serial to remote client. Chunk: " + self._txBuf + " Size: " + str(len(self._txBuf)))
+            self._log.debug("Send through serial to remote client. Chunk: " + self._txBuf + " Size: " + str(len(self._txBuf)))
             self._currentElementOut = self._currentElementOut[self._chunkSize:]
         else:
             self._basicOutput("Y F: No messages.")
-            self._log.writeLog("No more messages for yield. Exiting writeToExternalYield.")
+            self._log.debug("No more messages for yield. Exiting writeToExternalYield.")
 
     def writeToExternalProtocol(self):
         # Wrapper for protocol serial communitation
         if not self._protocolMessageQueue.empty():
             thisProtocolMessage = self._protocolMessageQueue.get()
             self._basicOutput(thisProtocolMessage)
-            self._log.writeLog("Send through serial to remote client: " + thisProtocolMessage + " Size: " + str(len(thisProtocolMessage)))
+            self._log.debug("Send through serial to remote client: " + thisProtocolMessage + " Size: " + str(len(thisProtocolMessage)))
         else:
-            self._log.writeLog("No protocol messages available. Exiting writeToExternalProtocol.")
+            self._log.debug("No protocol messages available. Exiting writeToExternalProtocol.")
 
     def writeToExternalJSON(self):
         # Wrapper for JSON serial communication
@@ -145,8 +138,8 @@ class serialCommunicationServer(communicationServer.communicationServer):
         if self._jsonBuf != "":
             self._txBuf = self._jsonBuf[0:self._chunkSize]
             self._basicOutput(self._txBuf)
-            self._log.writeLog("JSON: Send through serial to remote client. Chunk: " + self._txBuf + " Size: " + str(len(self._txBuf)))
+            self._log.debug("JSON: Send through serial to remote client. Chunk: " + self._txBuf + " Size: " + str(len(self._txBuf)))
             self._jsonBuf = self._jsonBuf[self._chunkSize:]
         else:
             self._basicOutput("J0F: No JSON chunks.")
-            self._log.writeLog("No more chunks for this JSON payload. Exiting writeToExternalJSON.")
+            self._log.debug("No more chunks for this JSON payload. Exiting writeToExternalJSON.")

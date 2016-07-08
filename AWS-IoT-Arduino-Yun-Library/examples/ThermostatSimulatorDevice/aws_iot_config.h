@@ -25,6 +25,7 @@
 #define AWS_IOT_ROOT_CA_FILENAME "aws-iot-rootCA.crt"           // your root-CA filename
 #define AWS_IOT_CERTIFICATE_FILENAME "certificate.pem.crt"                 // your certificate filename
 #define AWS_IOT_PRIVATE_KEY_FILENAME "private.pem.key"              // your private key filename
+#define AWS_IOT_DEBUG										// Enable debug logging. Remove it if you want to disable it.
 //===============================================================
 // SDK config, DO NOT modify it
 #define AWS_IOT_PATH_PREFIX "../certs/"

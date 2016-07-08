@@ -1,9 +1,20 @@
+#2.2.0 (July 5th, 2016)  
+Features:
+
+* Migrated Yun Python runtime backend to [AWS IoT Device SDK for Python](https://github.com/aws/aws-iot-device-sdk-python) v1.0.0.  
+
+Bugfixes/Improvements:  
+
+* Finished memory optimization for Yun C++ library and all examples, reducing dynamic memory consumption of examples to around 50%. Adressed part of [issue #13](https://github.com/aws/aws-iot-device-sdk-arduino-yun/issues/13).  
+* Fixed Serial write buffer issue in examples, addressing [pull request #17](https://github.com/aws/aws-iot-device-sdk-arduino-yun/pull/17).  
+* Refactored ThermostatSimulatorApp to use [AWS IoT Device SDK for Python](https://github.com/aws/aws-iot-device-sdk-python) v1.0.0. Added support for WebSocket.  
+
 #2.1.1 (May 23th, 2016)  
 Features:  
 
 N/A  
 
-Bugfixes.Improvements:  
+Bugfixes/Improvements:  
 
 * Fixed issue in retrieving shadow JSON key/value pair where value starts with a certain letter conflicts with the internal protocol.
 

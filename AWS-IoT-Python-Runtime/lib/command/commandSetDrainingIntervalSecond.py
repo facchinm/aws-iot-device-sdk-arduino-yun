@@ -19,8 +19,7 @@ import AWSIoTCommand
 
 
 class commandSetDrainingIntervalSecond(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.setDrainingIntervalSecond(srcDrainingIntervalSecond)
-    _mqttCoreHandler = None
+    # Target API: AWSIoTMQTTClient.configureDrainingFrequency(1/srcDrainingIntervalSecond)
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
         self._commandProtocolName = "di"
@@ -39,7 +38,7 @@ class commandSetDrainingIntervalSecond(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "DI1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.setDrainingIntervalSecond(float(self._parameterList[0]))
+                self._mqttCoreHandler.configureDrainingFrequency(1/float(self._parameterList[0]))
             except TypeError as e:
                 returnMessage = "DI2F: " + str(e.message)
             except ValueError as e:

@@ -33,6 +33,8 @@ expect {
 expect "*~#" { send "opkg update\r" }
 expect "*~#" { send "opkg install distribute\r" }
 expect "*~#" { send "opkg install python-openssl\r" }
+expect "*~#" { send "easy_install pip\r" }
+expect "*~#" { send "pip install AWSIoTPythonSDK==1.0.0\r" }
 expect "*~#" { send "exit\r" }
 # End of installation
 interact

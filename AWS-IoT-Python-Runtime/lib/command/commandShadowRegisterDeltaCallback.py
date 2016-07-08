@@ -15,18 +15,14 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import subscribeError
-from AWSIoTExceptions import subscribeTimeoutException
+from core.exception.AWSIoTExceptions import subscribeError
+from core.exception.AWSIoTExceptions import subscribeTimeoutException
 
 
 class commandShadowRegisterDeltaCallback(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowRegisterDeltaCallback(srcCallback)
     # Parameters: deviceShadowName, sketchSubscribeSlot, callback
-    _shadowRegistrationTable = None
-    _shadowSubscribeRecord = None
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcShadowRegistrationTable, srcShadowSubscribeRecord):
         self._commandProtocolName = "s_rd"

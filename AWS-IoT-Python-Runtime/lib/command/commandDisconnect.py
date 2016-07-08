@@ -15,26 +15,23 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import disconnectError
-from AWSIoTExceptions import disconnectTimeoutException
+from core.exception.AWSIoTExceptions import disconnectError
+from core.exception.AWSIoTExceptions import disconnectTimeoutException
 
 
 class commandDisconnect(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.disconnect()
-    _mqttCoreHandler = None
+    # Target API: AWSIoTMQTTShadowClient.disconnect()
 
-    def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
+    def __init__(self, srcParameterList, srcSerialCommuteServer, srcShadowClient):
         self._commandProtocolName = "d"
         self._parameterList = srcParameterList
         self._serialCommServerHandler = srcSerialCommuteServer
-        self._mqttCoreHandler = srcMQTTCore
+        self._shadowClientHandler = srcShadowClient
         self._desiredNumberOfParameters = 0
 
     def _validateCommand(self):
-        ret = self._mqttCoreHandler is not None and self._serialCommServerHandler is not None
+        ret = self._shadowClientHandler is not None and self._serialCommServerHandler is not None
         return ret and AWSIoTCommand.AWSIoTCommand._validateCommand(self)
 
     def execute(self):
@@ -43,7 +40,7 @@ class commandDisconnect(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "D1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.disconnect()
+                self._shadowClientHandler.disconnect()
             except disconnectError as e:
                 returnMessage = "D2F: " + str(e.message)
             except disconnectTimeoutException as e:

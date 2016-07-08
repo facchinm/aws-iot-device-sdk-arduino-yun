@@ -19,8 +19,7 @@ import AWSIoTCommand
 
 
 class commandSetOfflinePublishQueueing(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.setOfflinePublishQueueing(srcQueueSize, srcDropBehavior)
-    _mqttCoreHandler = None
+    # Target API: AWSIoTMQTTClient.configureOfflinePublishQueueing(srcQueueSize, srcDropBehavior)
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
         self._commandProtocolName = "pq"
@@ -39,7 +38,18 @@ class commandSetOfflinePublishQueueing(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "PQ1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.setOfflinePublishQueueing(int(self._parameterList[0]), int(self._parameterList[1]))
+                # In AWS IoT Python SDK:
+                # queueSize == 0 -> queue feature is turned off
+                # queueSize == -1 -> queue is infinite
+                # In IoT Yun SDK:
+                # queueSize == 0 -> queue is infinite
+                # queueSize == -1 is not checked
+                queueSizeSentToCore = int(self._parameterList[0])
+                if int(self._parameterList[0]) == 0:  # Infinite queue
+                    queueSizeSentToCore = -1
+                if int(self._parameterList[0]) < 0:  # Disable queue
+                    queueSizeSentToCore = 0
+                self._mqttCoreHandler.configureOfflinePublishQueueing(queueSizeSentToCore, int(self._parameterList[1]))
             except TypeError as e:
                 returnMessage = "PQ2F: " + str(e.message)
             except ValueError as e:

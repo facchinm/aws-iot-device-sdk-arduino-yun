@@ -15,193 +15,230 @@
  */
  '''
 
-# Thermostat App side control program
-
 import sys
-sys.path.append("./lib/protocol/")
-sys.path.append("./lib/util/")
-sys.path.append("./lib/exception/")
 import getopt
-from ssl import *
 import time
 import json
-import thread
 import glob
-
-# Check dependency
-libraryCheck = True
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
+# Tkinter
 try:
-    import paho.mqtt.client as mqtt
-    import logManager
-    import mqttCore
-    import AWSIoTExceptions
+    import tkinter  # Python 3.x
 except ImportError:
-    libraryCheck = False
-    print "paho-mqtt python package missing. Please install/reinstall it."
-try:
-    import Tkinter as tk
-except ImportError:
-    libraryCheck = False
-    print "Tkinter python package missing. Please install/reinstall it."
+    import Tkinter as tkinter
 
-# Tool functions
-def customCallback(client, userdata, message):
-    # print "ThermostatApp received a new message: " + str(message.payload) + " from topic: " + str(message.topic)
-    if str(message.topic) == "$aws/things/room/shadow/get/accepted" and userdata is not None:
-        recvJSONString = message.payload
-        reportedData = None
+# Class that defines and manages callback used in this app
+class ThermoSimAppCallbackPool:
+    def __init__(self, srcTkRoot, srcReportedDataDisplayBox, srcDeviceShadowHandler, srcReportedDataVariable, srcDesiredDataVariable):
+        self._tkRootHandler = srcTkRoot
+        self._reportedDataDisplayBox = srcReportedDataDisplayBox
+        self._reportedDataVariableHandler = srcReportedDataVariable
+        self._desiredDataVariableHandler = srcDesiredDataVariable
+        self._deviceShadowHandler = srcDeviceShadowHandler
+        self._reportedTemperatureDataFromNetwork = "XX.X"
+
+    def buttonCallback(self, srcSetTemperatureInputBox, srcDesiredDataVariable):
+        desiredData = None
         try:
-            recvJSONDict = json.loads(recvJSONString)
-            reportedData = recvJSONDict[u'state'][u'reported'][u'Temp']
-            userdata.set(str(reportedData) + " F") # Update the reported data in GUI
-        except Exception:
-            print "Invalid JSON or missing attribute"
-    else:
-        pass
+            desiredData = "{:.1f}".format((float)(srcSetTemperatureInputBox.get()))
+            if float(desiredData) >= 100.0:
+                print("Cannot set temperature higher than 100 F.")
+            elif float(desiredData) <= -100.0:
+                print("Cannot set temperature lower than -100 F.")
+            else:
+                JSONString = '{"state":{"desired":{"Temp":' + str(desiredData) + '}}}'
+                srcDesiredDataVariable.set(str(desiredData) + " F")
+                self._deviceShadowHandler.shadowUpdate(JSONString, None, 5)
+        except ValueError:
+            print("Setting desired temperature: Invalid temperature value!")
+        except Exception as e:
+            print(e.message)
 
-def getLatestReported(srcPythonMQTTCore):
-    while(True):
+    def shadowGetCallback(self, payload, responseStatus, token):
+        print(payload)
+        print("---------------")
+        print(responseStatus)
+        print("\n\n")
+        if responseStatus == "accepted":
+            try:
+                JSONResponseDictionary = json.loads(payload)
+                self._reportedTemperatureDataFromNetwork = JSONResponseDictionary[u"state"][u"reported"][u"Temp"]
+            except:
+                print("Invalid JSON or missing attribute")
+
+    def sendShadowGetForReportedTemperature(self, event=None):
         try:
-            srcPythonMQTTCore.publish("$aws/things/room/shadow/get", "", 0, False) # Start a shadow get request per 0.5 seconds, QoS 0
-            time.sleep(0.5)
-        except AWSIoTExceptions.publishTimeoutException:
-            print "Syncing reported data: A Publish Timeout Exception happened."
-        except AWSIoTExceptions.publishError:
-            print "Syncing reported data: A Publish Error happened."
-        except:
-            print "Syncing reported data: Unknown Error in Publish. Connected to WiFi?"
+            self._deviceShadowHandler.shadowGet(self.shadowGetCallback, 5)
+        except Exception as e:
+            print(e.message)
+        self._tkRootHandler.after(500, self.sendShadowGetForReportedTemperature)
 
-def buttonAction(srcEntry, srcPythonMQTTCore, srcDesiredData):
-    desiredData = None
-    try:
-        desiredData = "{:.1f}".format((float)(srcEntry.get())) # .1f
-        if float(desiredData) >= 100.0:
-            print "Cannot set temperature higher than 100 F."
-        elif float(desiredData) <= -100.0:
-            print "Cannot set temperature lower than -100 F."
+    def updateReportedTemperatureDataVariable(self, event=None):
+        # Also update the color
+        currentDesiredData = self._desiredDataVariableHandler.get()[:4]
+        if currentDesiredData != "XX.X":
+            if self._reportedTemperatureDataFromNetwork > float(currentDesiredData):
+                self._reportedDataDisplayBox.config(fg="blue")
+            elif self._reportedTemperatureDataFromNetwork < float(currentDesiredData):
+                self._reportedDataDisplayBox.config(fg="red")
+            else:
+                self._reportedDataDisplayBox.config(fg="black")
+        self._reportedDataVariableHandler.set(str(self._reportedTemperatureDataFromNetwork) + " F")
+        self._tkRootHandler.after(500, self.updateReportedTemperatureDataVariable)
+
+# Class that generates the GUI and starts the application
+class ThermoSimAppGUI:
+
+    _usage = """Usage:
+
+    Make sure that you put all your credentials under: ./certs/
+    with the following naming conventions:
+    Root CA file: *CA.crt
+    Certificate file (not required if using MQTT over WebSocket): *.pem.crt
+    Private key file (not required if using MQTT over WebSocket): *.pem.key
+
+    Use X.509 certificate based mutual authentication:
+    python ThermostatSimulatorApp -e <endpoint>
+
+    Use MQTT over WebSocket:
+    python ThermostatSimulatorApp -e <endpoint> -w
+
+    Type "python ThermostatSimulatorApp -h" for detailed command line options.
+
+
+    """
+
+    _helpInfo = """Available command line options:
+    -e, --endpoint: Your custom AWS IoT custom endpoint
+    -w, --websocket: Use MQTT over websocket
+    -h, --help: Help infomation
+
+
+    """
+
+    def __init__(self):
+        # Init data members
+        # Connection related
+        self._endpoint = ""
+        self._rootCAFilePathList = ""
+        self._certificateFilePathList = ""
+        self._privateKeyFilePathList = ""
+        self._useWebsocket = False
+        self._AWSIoTMQTTShadowClient = None
+        self._thermostatSimulatorShadowHandler = None
+        # GUI related
+        self._tkRootHandler = tkinter.Tk()
+        self._reportedDataVariable = None
+        self._reportedDataDisplayBox = None
+        self._desiredDataVariable = None
+        self._desiredDataDisplayBox = None
+        self._setTemperatureInputBox = None
+        self._setTemperatureButton = None
+        # Check command line inputs
+        if not self._checkInputs():
+            raise ValueError("Malformed/Missing command line inputs.")
+        # Create and configure AWSIoTMQTTShadowClient
+        self._AWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient("ThermostatSimulatorApp", useWebsocket=self._useWebsocket)
+        if self._useWebsocket:
+            self._AWSIoTMQTTShadowClient.configureEndpoint(self._endpoint, 443)
+            self._AWSIoTMQTTShadowClient.configureCredentials(self._rootCAFilePathList[0])
         else:
-            JSONString = '{"state":{"desired":{"Temp":' + str(desiredData) + '}}}'
-            # Update shadow desired state attribute
-            srcDesiredData.set(str(desiredData) + " F")
-            srcPythonMQTTCore.publish("$aws/things/room/shadow/update", JSONString, 0, False)
-            print "Set Temp: " + str(desiredData) + " F"
-    except AWSIoTExceptions.publishTimeoutException:
-        print "Setting desired data: A Publish Timeout Exception happened."
-    except AWSIoTExceptions.publishError:
-        print "Setting desired data: A Publish Error happened."
-    except ValueError:
-        print "Setting desired data: Set Temp value error!"
+            self._AWSIoTMQTTShadowClient.configureEndpoint(self._endpoint, 8883)
+            self._AWSIoTMQTTShadowClient.configureCredentials(self._rootCAFilePathList[0], self._privateKeyFilePathList[0], self._certificateFilePathList[0])
+        self._AWSIoTMQTTShadowClient.configureAutoReconnectBackoffTime(1, 128, 20)
+        self._AWSIoTMQTTShadowClient.configureConnectDisconnectTimeout(10)
+        self._AWSIoTMQTTShadowClient.configureMQTTOperationTimeout(5)
+        # Set keepAlive interval to be 1 second and connect
+        # Raise exception if there is an error in connecting to AWS IoT
+        self._AWSIoTMQTTShadowClient.connect(5)
+        self._thermostatSimulatorShadowHandler = self._AWSIoTMQTTShadowClient.createShadowHandlerWithName("room", True)
+        # Generate GUI
+        self._packModule()
 
-# Check host
-checkHost = True
-host = None
-try:
-    opts, args = getopt.getopt(sys.argv[1:], "h:", ["host="])
-    if len(opts) == 0:
-        raise getopt.GetoptError("No input parameters")
-    for opt, arg in opts:
-        if opt in ("-h", "--host"):
-            host = arg
-except getopt.GetoptError:
-    print "usage: python ThermostatSimulatorApp.py -h <host_address>"
-    checkHost = False
+    # Validate command line inputs
+    # Return False there is any malformed inputs
+    # Return True if all the necessary inputs have been discovered
+    def _checkInputs(self):
+        gotEoughInputs = True
+        # Check command line inputs
+        try:
+            opts, args = getopt.getopt(sys.argv[1:], "hwe:", ["endpoint=", "websocket", "help"])
+            if len(opts) == 0:
+                raise getopt.GetoptError("No input parameters")
+            for opt, arg in opts:
+                if opt in ("-e", "--endpoint"):
+                    self._endpoint = arg
+                if opt in ("-w", "--websocket"):
+                    self._useWebsocket = True
+                if opt in ("-h", "--help"):
+                    print(self._helpInfo)
+                    gotEoughInputs = False
+        except getopt.GetoptError:
+            print(self._usage)
+            gotEoughInputs = False
+        # Check credential files
+        if gotEoughInputs:
+            self._rootCAFilePathList = glob.glob("./certs/*CA.crt")
+            if self._useWebsocket:
+                gotEoughInputs = gotEoughInputs and len(self._rootCAFilePathList) != 0
+                if not gotEoughInputs:
+                    print("Missing rootCA in ./certs/")
+            else:
+                self._certificateFilePathList = glob.glob("./certs/*.pem.crt")
+                self._privateKeyFilePathList = glob.glob("./certs/*.pem.key")
+                gotEoughInputs = gotEoughInputs and len(self._rootCAFilePathList) != 0 and len(self._certificateFilePathList) != 0 and len(self._privateKeyFilePathList) != 0
+                if not gotEoughInputs:
+                    print("Missing rootCA, certificate or private key in ./certs/")
+        return gotEoughInputs
 
-# Get credentials
-rootCA = glob.glob("./certs/*CA.crt")
-certificate = glob.glob("./certs/*.pem.crt")
-privateKey = glob.glob("./certs/*.pem.key")
-credentialCheck = len(rootCA) > 0 and len(certificate) > 0 and len(privateKey) > 0
+    def _packModule(self):
+        self._tkRootHandler.title("ThermostatSimulatorApp")
+        self._tkRootHandler.geometry("500x250")
+        self._tkRootHandler.resizable(width=False, height=False)
+        # Pack all frames
+        baseFrame = tkinter.Frame(self._tkRootHandler)
+        temperatureFrame = tkinter.Frame(baseFrame)
+        temperatureFrame.pack(side="top")
+        controlPanelFrame = tkinter.Frame(baseFrame)
+        controlPanelFrame.pack(side="bottom")
+        baseFrame.pack()
+        # Pack all modules for temperature frame
+        self._reportedDataVariable = tkinter.StringVar()
+        self._reportedDataVariable.set("XX.X F")
+        reportedDataTag = tkinter.Label(temperatureFrame, text="Reported Temperature:", justify="left")
+        self._reportedDataDisplayBox = tkinter.Label(temperatureFrame, textvariable=self._reportedDataVariable, font=("Arial", 55), justify="left")
+        #
+        self._desiredDataVariable = tkinter.StringVar()
+        self._desiredDataVariable.set("XX.X F")
+        desiredDataTag = tkinter.Label(temperatureFrame, text="Desired Temperature:", justify="left")
+        self._desiredDataDisplayBox = tkinter.Label(temperatureFrame, textvariable=self._desiredDataVariable, font=("Arial", 55), justify="left")
+        #
+        reportedDataTag.pack()
+        self._reportedDataDisplayBox.pack()
+        desiredDataTag.pack()
+        self._desiredDataDisplayBox.pack()
+        # Create a callback pool
+        self._callbackPoolHandler = ThermoSimAppCallbackPool(self._tkRootHandler, self._reportedDataDisplayBox, self._thermostatSimulatorShadowHandler, self._reportedDataVariable, self._desiredDataVariable)
+        # Pack all modules for control panel frame
+        self._setTemperatureInputBox = tkinter.Entry(controlPanelFrame)
+        self._setTemperatureInputBox.pack(sid="left")
+        self._setTemperatureButton = tkinter.Button(controlPanelFrame, text="SET", command=lambda: self._callbackPoolHandler.buttonCallback(self._setTemperatureInputBox, self._desiredDataVariable))
+        self._setTemperatureButton.pack()
+
+    def runApp(self):
+        # Start and run the app
+        self._tkRootHandler.after(500, self._callbackPoolHandler.sendShadowGetForReportedTemperature)  # per 500ms
+        self._tkRootHandler.after(500, self._callbackPoolHandler.updateReportedTemperatureDataVariable)  # per 500ms
+        self._tkRootHandler.mainloop()
 
 # Main
-setupSuccess = True
-if not libraryCheck:
-    pass
-elif not checkHost:
-    pass
-elif not credentialCheck:
-    print "Missing credentials. Have you put in any credentials in certs/?"
-else:
+if __name__ == '__main__':
+    # Start the app
     try:
-        # MQTT connection setup
-        myLog = logManager.logManager("ThermostatSimulatorApp.py", "./log/") # Enabled by default
-        # Switch to enableFileOutput if you need detailed debug info written to a file
-        myLog.disableFileOutput()
-        # Switch to enableConsolePrint if you need detailed debug info
-        # myLog.enableConsolePrint()
-        myLog.disableConsolePrint()
-        myPythonMQTTCore = mqttCore.mqttCore("ThermostatSimulatorApp", True, mqtt.MQTTv311, myLog)
-        myPythonMQTTCore.setConnectDisconnectTimeout(10)
-        myPythonMQTTCore.setMQTTOperationTimeout(5)
-        myPythonMQTTCore.config(host, 8883, rootCA[0], privateKey[0], certificate[0])
-        myPythonMQTTCore.connect()
-        # Shadow topic subscription
-        myPythonMQTTCore.subscribe("$aws/things/room/shadow/get/accepted", 0, customCallback)
-    except AWSIoTExceptions.connectTimeoutException:
-        setupSuccess = False
-        print "A Connect Timeout Exception happened."
-    except AWSIoTExceptions.connectError:
-        setupSuccess = False
-        print "A Connect Error happened."
-    except AWSIoTExceptions.subscribeTimeoutException:
-        setupSuccess = False
-        print "A Subscribe Timeout Exception happened."
-    except AWSIoTExceptions.subscribeError:
-        setupSuccess = False
-        print "A Subscribe Error happened."
-    except SSLError:
-        setupSuccess = False
-        print "An SSL Error happened. Please check your host address and credentials."
-    except Exception as e:
-        setupSuccess = False
-        print "Unknown Error in setup. Disconnected from WiFi? Wrong host address?"
-    finally:
-        if not setupSuccess:
-            print "Setup failed. Halt."
+        thisThermoSimAppGUI = ThermoSimAppGUI()
+        thisThermoSimAppGUI.runApp()
+    except ValueError:
+        print("Terminated.")
+    except KeyboardInterrupt:
+        print("Terminated.")
 
-    if setupSuccess:
-        print "Connected."
-        print "Generating GUI..."
-        # LAYOUT
-        root = tk.Tk()
-        root.title("ThermostatSimulatorApp")
-        root.geometry("500x250")
-        root.resizable(width=False, height=False)
-        frm = tk.Frame(root)
-        # Temp display
-        frm_T = tk.Frame(frm)
-        frm_T.pack(side="top")
-        # Control panel
-        frm_B = tk.Frame(frm)
-        frm_B.pack(side="bottom")
-        frm.pack()
-        
-        # MODULE
-        # frm_T
-        reportedData = tk.StringVar()
-        reportedData.set("XX.X F")
-        #
-        myPythonMQTTCore.setUserData(reportedData) # Set the string variable as the private user data in mqttCore
-        thread.start_new_thread(getLatestReported, (myPythonMQTTCore,)) # Start a background thread to continuously getting latest reported temp.
-        #
-        reportedTag = tk.Label(frm_T, text="Reported Temperature:", justify="left")
-        reportedLabel = tk.Label(frm_T, textvariable=reportedData, font=("Arial", 55), justify="left")
-        
-        desiredData = tk.StringVar()
-        desiredData.set("XX.X F")
-        desiredTag = tk.Label(frm_T, text="Desired Temperature:", justify="left")
-        desiredLabel = tk.Label(frm_T, textvariable=desiredData, font=("Arial", 55), justify="left")
-        
-        reportedTag.pack()
-        reportedLabel.pack()
-        desiredTag.pack()
-        desiredLabel.pack()
-        
-        # frm_B
-        inputTempValEntry = tk.Entry(frm_B)
-        inputTempValEntry.pack(side="left")
-        setButton = tk.Button(frm_B, text="SET", command=lambda: buttonAction(inputTempValEntry, myPythonMQTTCore, desiredData))
-        setButton.pack()
-        
-        root.mainloop()
-        
-        

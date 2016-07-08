@@ -15,17 +15,13 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import unsubscribeError
-from AWSIoTExceptions import unsubscribeTimeoutException
+from core.exception.AWSIoTExceptions import unsubscribeError
+from core.exception.AWSIoTExceptions import unsubscribeTimeoutException
 
 
 class commandUnsubscribe(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.unsubscribe(topic)
-    _mqttCoreHandler = None
-    _mqttSubscribeTable = None
+    # Target API: AWSIoTMQTTClient.unsubscribe(topic)
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore, srcMQTTSubscribeTable):
         self._commandProtocolName = "u"

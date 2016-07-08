@@ -15,15 +15,16 @@
  */
  '''
 
+import os
 import sys
-sys.path.append("../lib/")
-from util.logManager import logManager
+sys.path.insert(0, "../lib/")
+import AWSIoTPythonSDK
+sys.path.insert(0, os.path.abspath(AWSIoTPythonSDK.__file__))
+import logging
+from threading import Lock
 from util.jsonManager import jsonManager
-from protocol.mqttCore import *
 from exception.AWSIoTExceptions import *
 from comm.serialCommunicationServer import *
-from shadow.deviceShadow import *
-from shadow.shadowManager import *
 from command.AWSIoTCommand import *
 from command.commandConnect import *
 from command.commandDisconnect import *
@@ -42,18 +43,20 @@ from command.commandJSONKeyVal import *
 from command.commandSetBackoffTiming import *
 from command.commandSetOfflinePublishQueueing import *
 from command.commandSetDrainingIntervalSecond import *
-from protocol.paho.client import *
+# Use IoT Python SDK as backend
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
+from AWSIoTPythonSDK.MQTTLib import MQTTv3_1, MQTTv3_1_1
 # import traceback
 
 
 # Object for each MQTT subscription to hold the sketch info (slot #)
 class _mqttSubscribeUnit:
-    _topicName = None
-    _sketchSlotNumber = -1
-    _formatPayloadForYield = None
-    _serialCommunicationServerHub = None
 
     def __init__(self, srcFormatPayloadForYieldFunctionPointer):
+        self._topicName = None
+        self._sketchSlotNumber = -1
+        self._formatPayloadForYield = None
+        self._serialCommunicationServerHub = None
         self._formatPayloadForYield = srcFormatPayloadForYieldFunctionPointer
 
     def setTopicName(self, srcTopicName):
@@ -92,32 +95,29 @@ class _mqttSubscribeUnit:
 
 
 class runtimeHub:
-    # Objects
-    _logManagerHub = None
-    _serialCommunicationServerHub = None
-    _mqttCoreHub = None  # Init when requested
-    _shadowManagerHub = None  # Init when requested
-    _jsonManagerHub = None
-    # Data structures
-    # Keep the record of MQTT subscribe sketch info (slot #), in forms of individual object
-    _mqttSubscribeTable = None
-    # Keep the record of shadow subscribe sketch info (slot #)
-    _shadowSubscribeRecord = None
-    # Keep track of the deviceShadow instances for each individual deviceShadow name
-    _shadowRegistrationTable = None
-
+    
     #### Methods start here ####
-    def __init__(self, srcFileName, srcDirectory):
-        # Init with basic interface for logging and serial communication
-        self._logManagerHub = logManager(srcFileName, srcDirectory)
-        self._logManagerHub.disable()
-        self._serialCommunicationServerHub = serialCommunicationServer(self._logManagerHub)
+    def __init__(self, srcFileName, srcLogDirectory):
+        # Init with basic interface for serial communication
+        self._log = logging.getLogger(__name__)
+        self._serialCommunicationServerHub = serialCommunicationServer()
         self._serialCommunicationServerHub.setAcceptTimeout(10)
         self._serialCommunicationServerHub.setChunkSize(50)
         self._jsonManagerHub = jsonManager(512*3)  # Default history limits is set to be 512*3, 512 for accepted, 512 for rejected and 512 for deltas
+        # Keep the record of MQTT subscribe sketch info (slot #), in forms of individual object
         self._mqttSubscribeTable = dict()
+        # Keep the record of shadow subscribe sketch info (slot #)
         self._shadowSubscribeRecord = dict()
+        # Keep track of the deviceShadow instances for each individual deviceShadow name
         self._shadowRegistrationTable = dict()
+        # MQTT Connection
+        self._mqttClientHub = None  # Init when requested
+        self._shadowClientHub = None  # Init when requested
+        # ShadowCallback Lock
+        self._shadowCallbackLock = Lock()
+
+    def _getAWSIoTMQTTShadowClient(self, clientID, protocol, useWebsocket, cleanSession):
+        return AWSIoTMQTTShadowClient(clientID, protocol, useWebsocket, cleanSession)
 
     def _findCommand(self, srcProtocolMessage):
         # Whatever comes out of this method should be an AWSIoTCommand
@@ -133,55 +133,53 @@ class runtimeHub:
                 if len(srcProtocolMessage[1:]) == 4:
                     clientID = srcProtocolMessage[1]
                     cleanSession = srcProtocolMessage[2] == "1"
-                    protocol = MQTTv31
+                    protocol = MQTTv3_1
                     if srcProtocolMessage[3] == "4":
-                        protocol = MQTTv311
+                        protocol = MQTTv3_1_1
                     useWebsocket = srcProtocolMessage[4] == "1"
                     try:
-                        self._mqttCoreHub = mqttCore(clientID, cleanSession, protocol, self._logManagerHub, useWebsocket)
-                        self._mqttCoreHub.setConnectDisconnectTimeoutSecond(10)
-                        self._mqttCoreHub.setMQTTOperationTimeoutSecond(5)
+                        self._shadowClientHub = self._getAWSIoTMQTTShadowClient(clientID, protocol, useWebsocket, cleanSession)
+                        self._shadowClientHub.configureConnectDisconnectTimeout(10)
+                        self._shadowClientHub.configureMQTTOperationTimeout(5)
+                        self._mqttClientHub = self._shadowClientHub.getMQTTConnection()
                     except TypeError:
                         retCommand.setInitSuccess(False)  # Error in Init, set flag 
                 else:
                     retCommand.setInitSuccess(False)  # Error in obtain parameters for Init
             # Config
             elif srcProtocolMessage[0] == "g":
-                retCommand = commandConfig(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandConfig(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._shadowClientHub)
             # Connect
             elif srcProtocolMessage[0] == "c":
-                retCommand = commandConnect(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandConnect(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._shadowClientHub)
             # Disconnect
             elif srcProtocolMessage[0] == "d":
-                retCommand = commandDisconnect(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandDisconnect(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._shadowClientHub)
             # Publish
             elif srcProtocolMessage[0] == "p":
-                retCommand = commandPublish(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandPublish(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttClientHub)
             # Subscribe
             elif srcProtocolMessage[0] == "s":
                 newMQTTSubscribeUnit = _mqttSubscribeUnit(self._formatPayloadForYield)  # Init an individual object for this subscribe
                 newSrcProtocolMessage = srcProtocolMessage
                 newSrcProtocolMessage.append(newMQTTSubscribeUnit)
-                retCommand = commandSubscribe(newSrcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub, self._mqttSubscribeTable)
+                retCommand = commandSubscribe(newSrcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttClientHub, self._mqttSubscribeTable)
             # Unsubscribe
             elif srcProtocolMessage[0] == "u":
-                retCommand = commandUnsubscribe(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub, self._mqttSubscribeTable)
+                retCommand = commandUnsubscribe(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttClientHub, self._mqttSubscribeTable)
             # Shadow init
             elif srcProtocolMessage[0] == "si":
                 retCommand = AWSIoTCommand.AWSIoTCommand("si")
-                if self._mqttCoreHub is None:
+                if self._shadowClientHub is None:
                     # Should have init a mqttCore and got it connected
                     retCommand.setInitSuccess(False)
                 else:
-                    # Init the shadowManager if needed
-                    if self._shadowManagerHub is None:
-                        self._shadowManagerHub = shadowManager(self._mqttCoreHub)
                     # Now register the requested deviceShadow name
                     if len(srcProtocolMessage[1:]) == 2:
                         srcShadowName = srcProtocolMessage[1]
                         srcIsPersistentSubscribe = srcProtocolMessage[2] == "1"
                         try:
-                            newDeviceShadow = deviceShadow(srcShadowName, srcIsPersistentSubscribe, self._shadowManagerHub)
+                            newDeviceShadow = self._shadowClientHub.createShadowHandlerWithName(srcShadowName, srcIsPersistentSubscribe)
                             # Now update the registration table
                             self._shadowRegistrationTable[srcShadowName] = newDeviceShadow
                         except TypeError:
@@ -222,13 +220,13 @@ class runtimeHub:
                 retCommand = commandJSONKeyVal(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._jsonManagerHub)
             # Backoff Timing Config
             elif srcProtocolMessage[0] == 'bf':
-                retCommand = commandSetBackoffTiming(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandSetBackoffTiming(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttClientHub)
             # Offline Publish Queue Config
             elif srcProtocolMessage[0] == 'pq':
-                retCommand = commandSetOfflinePublishQueueing(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandSetOfflinePublishQueueing(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttClientHub)
             # Draining Interval Config
             elif srcProtocolMessage[0] == 'di':
-                retCommand = commandSetDrainingIntervalSecond(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttCoreHub)
+                retCommand = commandSetDrainingIntervalSecond(srcProtocolMessage[1:], self._serialCommunicationServerHub, self._mqttClientHub)
             # Exit the runtimeHub
             elif srcProtocolMessage[0] == "~":
                 retCommand = AWSIoTCommand.AWSIoTCommand("~")
@@ -259,11 +257,12 @@ class runtimeHub:
         # Store JSON payload into jsonManager and pass the handler over
         # Parse the handler into protocol-style chunks that can be transimitted over the serial
         # and understood by Atmega
-        # Execution of this callback is ATOMIC for each shadow action in ONE deviceShadow (Guaranteed by SDK)
+        # Execution of this callback can be in separate threads (SDK), therefore an extra lock is added here
         # All token/version controls are performed at deviceShadow level
         # Whatever comes in here should be delivered across serial, with care, of course
         ####
         # srcCurrentType: accepted//rejected//<deviceShadowName>/delta
+        self._shadowCallbackLock.acquire()
         currentJSONHandler = self._jsonManagerHub.storeNewJSON(srcPayload, srcCurrentType)
         currentSketchSlotNumber = -1
         try:
@@ -286,7 +285,10 @@ class runtimeHub:
             self._serialCommunicationServerHub.writeToInternalYield(formattedPayload)
             # This message will get to be transmitted in future Yield requests
         except KeyError as e:
-            pass  # Ignore messages coming between callback and unregister delta 
+            self._shadowCallbackLock.release()
+            return
+            # Ignore messages coming between callback and unregister delta 
+        self._shadowCallbackLock.release()
 
     # Runtime function
     def run(self):
@@ -327,8 +329,8 @@ class runtimeHub:
                         self._serialCommunicationServerHub.writeToExternalProtocol()
 
             except AWSIoTExceptions.acceptTimeoutException as e:
-                self._logManagerHub.writeLog(str(e.message))
+                self._log.debug(str(e.message))
                 break
             except Exception as e:
-                self._logManagerHub.writeLog("Exception in run: " + str(type(e)) + str(e.message))
+                self._log.debug("Exception in run: " + str(type(e)) + str(e.message))
                 # traceback.print_exc(file, sys.stdout)

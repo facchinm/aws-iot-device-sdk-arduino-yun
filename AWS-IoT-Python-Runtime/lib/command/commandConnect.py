@@ -15,27 +15,24 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
 from ssl import SSLError
-from AWSIoTExceptions import connectError
-from AWSIoTExceptions import connectTimeoutException
+from core.exception.AWSIoTExceptions import connectError
+from core.exception.AWSIoTExceptions import connectTimeoutException
 
 
 class commandConnect(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.connect(keepAliveInterval)
-    _mqttCoreHandler = None
+    # Target API: AWSIoTMQTTShadowClient.connect(keepAliveInterval)
 
-    def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
+    def __init__(self, srcParameterList, srcSerialCommuteServer, srcShadowClient):
         self._commandProtocolName = "c"
         self._parameterList = srcParameterList
         self._serialCommServerHandler = srcSerialCommuteServer
-        self._mqttCoreHandler = srcMQTTCore
+        self._shadowClientHandler = srcShadowClient
         self._desiredNumberOfParameters = 1
 
     def _validateCommand(self):
-        ret = self._mqttCoreHandler is not None and self._serialCommServerHandler is not None
+        ret = self._shadowClientHandler is not None and self._serialCommServerHandler is not None
         return ret and AWSIoTCommand.AWSIoTCommand._validateCommand(self)
 
     def execute(self):
@@ -44,7 +41,7 @@ class commandConnect(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "C1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.connect(int(self._parameterList[0]))
+                self._shadowClientHandler.connect(int(self._parameterList[0]))
             except TypeError as e:
                 returnMessage = "C2F: " + str(e.message)
             except SSLError as e:

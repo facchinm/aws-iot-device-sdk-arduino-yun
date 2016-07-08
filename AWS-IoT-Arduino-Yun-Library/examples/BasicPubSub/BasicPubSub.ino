@@ -41,7 +41,7 @@ void setup() {
   while(!Serial);
   //
   char curr_version[80];
-  sprintf(curr_version, "AWS IoT SDK Version(dev) %d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
+  snprintf_P(curr_version, 80, PSTR("AWS IoT SDK Version(dev) %d.%d.%d-%s\n"), VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
   Serial.println(curr_version);
   // Set up the client
   if((rc = myClient.setup(AWS_IOT_CLIENT_ID)) == 0) {
@@ -57,17 +57,17 @@ void setup() {
         }
       }
       else {
-        Serial.println("Connect failed!");
+        Serial.println(F("Connect failed!"));
         Serial.println(rc);
       }
     }
     else {
-      Serial.println("Config failed!");
+      Serial.println(F("Config failed!"));
       Serial.println(rc);
     }
   }
   else {
-    Serial.println("Setup failed!");
+    Serial.println(F("Setup failed!"));
     Serial.println(rc);
   }
   // Delay to make sure SUBACK is received, delay time could vary according to the server
@@ -79,7 +79,7 @@ void loop() {
     // Generate a new message in each loop and publish to "topic1"
     sprintf(msg, "new message %d", cnt);
     if((rc = myClient.publish("topic1", msg, strlen(msg), 1, false)) != 0) {
-      Serial.println("Publish failed!");
+      Serial.println(F("Publish failed!"));
       Serial.println(rc);
     }
   
@@ -90,7 +90,7 @@ void loop() {
     }
   
     // Done with the current loop
-    sprintf(msg, "loop %d done", cnt++);
+    sprintf_P(msg, PSTR("loop %d done"), cnt++);
     Serial.println(msg);
   
     delay(1000);

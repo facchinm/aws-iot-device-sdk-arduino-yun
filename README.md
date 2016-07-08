@@ -5,6 +5,7 @@
 The AWS-IoT-Arduino-Yún-SDK allows developers to connect their Arduino Yún compatible Board to AWS IoT. By connecting the device to the AWS IoT, users can securely work with the message broker, rules and the Thing Shadow provided by AWS IoT and with other AWS services like AWS Lambda, Amazon Kinesis, Amazon S3, etc.
 
 * [Overview](#overview)
+* [Credentials](#credentials)
 * [Installation](#installation)
 * [API documentation](#api)
 * [Key features](#keyfeatures)
@@ -18,11 +19,25 @@ The AWS-IoT-Arduino-Yún-SDK allows developers to connect their Arduino Yún com
 <a name="overview"></a>
 ## Overview
 This document provides step by step instructions to install the Arduino Yún SDK and connect your device to the AWS IoT.  
-The AWS-IoT-Arduino-Yún-SDK consists of two parts, which take use of the resources of the two chips on Arduino Yún, one for native Arduino IDE API access and the other for functionality and connections to the AWS IoT built on top of a modified [Eclipse Paho](https://eclipse.org/paho/clients/python/) paho-mqtt python package.
+The AWS-IoT-Arduino-Yún-SDK consists of two parts, which take use of the resources of the two chips on Arduino Yún, one for native Arduino IDE API access and the other for functionality and connections to the AWS IoT built on top of [AWS IoT Device SDK for Python](https://github.com/aws/aws-iot-device-sdk-python).
 ### MQTT connection
 The AWS-IoT-Arduino-Yún-SDK provides APIs to let users publish messages to AWS IoT and subscribe to MQTT topics to receive messages transmitted by other devices or coming from the broker. This allows to interact with the standard MQTT PubSub functionality of AWS IoT. More information on MQTT protocol is available [here](http://docs.aws.amazon.com/iot/latest/developerguide/protocols.html).
 ### Thing shadow
 The AWS-IoT-Arduino-Yún-SDK also provides APIs to provide access to thing shadows in AWS IoT. Using this SDK, users will be able to sync the data/status of their devices as JSON files to the cloud and respond to change of status requested by other applications. More information on Thing Shadow is available [here](http://docs.aws.amazon.com/iot/latest/developerguide/iot-thing-shadows.html).
+
+****
+
+<a name="credentials"></a>
+## Credentials  
+The SDK supports two types of credentials that correspond to the two connection types:
+
+### X.509 certificate
+
+For the certificate-based mutual authentication connection type. Download the [AWS IoT root CA](https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem). Use the AWS IoT console to create and download the certificate and private key. You must upload these credentials along with the Python runtime code base to AR9331 on Yún board and specify the location of these files in a configuration file `aws_iot_config.h`.
+
+### IAM credentials
+
+For the Websocket with Signature Version 4 authentication type. You will need IAM credentials: an access key ID, a secret access key. You must also download and upload the [AWS IoT root CA](https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem). A tooling script `AWSIoTArduinoYunWebsocketCredentialConfig.sh` is provided for Mac OS/Linux users to update the IAM credentials as environment variables on AR9331, Yún board.  
 
 ****
 
@@ -45,15 +60,15 @@ For Arduino IDE installation on Linux, please visit [here](http://playground.ard
 3. Download the AWS IoT CA file from [here](https://www.symantec.com/content/en/us/enterprise/verisign/roots/VeriSign-Class%203-Public-Primary-Certification-Authority-G5.pem).
 4. Put your AWS IoT CA file, private key and certificate into `AWS-IoT-Arduino-Yun-SDK/AWS-IoT-Python-Runtime/certs`. If you are using MQTT over Websocket, you can put only your AWS IoT CA file into the directory. You should have a correctly configured AWS Identity and Access Management (IAM) role with a proper policy, and a pair of AWS Access Key and AWS Secret Access Key ID, which will be used in step 6. For more information about IAM, please visit [AWS IAM home page](https://aws.amazon.com/iam/).  
 5. Open a terminal, cd to `AWS-IoT-Arduino-Yun-SDK`. Do `chmod 755 AWSIoTArduinoYunInstallAll.sh` and execute it as `./AWSIoTArduinoYunInstallAll.sh <Board IP> <UserName> <Board Password>`. By default for Arduino Yún Board, your user name will be `root` and your password will be `arduino`.  
-	This script will upload the python runtime codebase and credentials to openWRT running on the more powerful microcontroller on you Arduino Yún board.  
+	This script will upload the python runtime code base and credentials to openWRT running on the more powerful micro-controller on you Arduino Yún board.  
 	This script will also download and install libraries for openWRT to implement the necessary scripting environment as well as communication protocols.
 
-  Step 5 can take 1-5 minutes for the device to download and install the required packages (distribute, python-openssl).  
+  Step 5 can take 10-15 minutes for the device to download and install the required packages (distribute, python-openssl, pip, AWSIoTPythonSDKv1.0.0).  
 
   NOTE: Do NOT close the terminal before the script finishes, otherwise you have to start over with step 5. Make sure you are in your local terminal before repeating step 5.  
 
 6. Optional, only for Websocket. Open a terminal, cd to `AWS-IoT-Arduino-Yun-SDK`. Do `chmod 755 AWSIoTArduinoYunWebsocketCredentialConfig.sh` and execute it as `./AWSIoTArduinoYunWebsocketCredentialConfig.sh <Board iP> <UserName> <Board Password> <AWS_ACCESS_KEY_ID_STRING> <AWS_SECRET_ACCESS_KEY_STRING>`.  
-	This script will add the given key ID and secret key onto the OpenWRT as envrionment variables `$AWS_ACCESS_KEY_ID` and `$AWS_SECRET_ACCESS_KEY`.  
+	This script will add the given key ID and secret key onto the OpenWRT as environment variables `$AWS_ACCESS_KEY_ID` and `$AWS_SECRET_ACCESS_KEY`.  
 	
 	NOTE1: You can always use this script to update your IAM credentials used on the board. The script will handle the update of the environment variables for you.  
 	
@@ -82,10 +97,12 @@ Before proceeding to the following steps, please make sure that you have `Putty`
 		opkg update
 		opkg install distribute
 		opkg install python-openssl
+		easy_install pip
+		pip install AWSIoTPythonSDK==1.0.0
 	
-  It can take 1-5 minutes for the device to download and install the required packages.
+  It can take 10-15 minutes for the device to download and install the required packages.
   
-7. Optional, only for Websocket. Use Putty to ssh into OpenWRT on your board and modify `/etc/profile` to include your IAM credentials as envrionment variables:  
+7. Optional, only for Websocket. Use Putty to ssh into OpenWRT on your board and modify `/etc/profile` to include your IAM credentials as environment variables:  
 
 		...
 		export AWS_ACCESS_KEY_ID=<AWS_ACCES_KEY_ID_STRING>
@@ -156,7 +173,7 @@ NONE\_ERROR if the setup on openWRT side and connection settings are correct.
 NULL\_VALUE\_ERROR if input parameters have NULL value.  
 OVERFLOW\_ERROR if input string exceeds the internal buffer size.  
 SET\_UP\_ERROR if the setup failed.  
-SERIAL1\_COMMUNICATION\_ERROR if there is an error in serial1 communication between the two chips.  
+SERIAL1\_COMMUNICATION\_ERROR if there is an error in Serial1 communication between the two chips.  
 GENERIC\_ERROR if an unknown error happens.
 
 <a name="config"></a>
@@ -178,7 +195,7 @@ Configure host, port and certs location used to connect to AWS IoT. If the input
 **Returns**  
 NONE\_ERROR if the configuration is successful.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 CONFIG\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.
 
@@ -199,16 +216,16 @@ Configure host, port and rootCA location used to connect to AWS IoT over Websock
 **Returns**  
 NONE\_ERROR if the configuration is successful.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 CONFIG\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.
 
 <a name="configBackoffTiming"></a>
 ### IoT\_Error\_t configBackoffTiming(unsigned int baseReconnectQuietTimeSecond, unsigned int maxReconnectQuietTimeSecond, unsigned int stableConnectionTimeSecond)  
 **Description**  
-Configure the progressive backoff timing on reconnect. Time interval for reconnect attempt will increase/double from baseReconnectQuietTimeSecond to maxReconnectQuietTimeSecond. Once a connection is live for longer than stableConnectionTimeSecond, the time interval will be reset to baseReconnectQuietTimeSecond. Note that stableConnectionTimeSecond must be greater than baseReconnectQuietTimeSecond. More details about progressive backoff can be found [here](#progressiveBackoff).  
+Configure the progressive back-off timing on reconnect. Time interval for reconnect attempt will increase/double from baseReconnectQuietTimeSecond to maxReconnectQuietTimeSecond. Once a connection is live for longer than stableConnectionTimeSecond, the time interval will be reset to baseReconnectQuietTimeSecond. Note that stableConnectionTimeSecond must be greater than baseReconnectQuietTimeSecond. More details about progressive back-off can be found [here](#progressiveBackoff).  
 
-Note that if this API is not called, the following default values will be used to configure the backoff timing:  
+Note that if this API is not called, the following default values will be used to configure the back-off timing:  
 
 	baseReconnectQuietTimeSecond = 1;
 	maxReconnectQuietTimeSecond = 128;
@@ -219,20 +236,21 @@ Note that if this API is not called, the following default values will be used t
 	object.configBackoffTiming(1, 32, 20); // Configure baseReconnectQuietTimeSecond to be 1 second. Configure maxReconnectQuietTimeSecond to be 32 seconds. Configure stableConnectionTimeSecond to be 20 seconds.
 
 **Parameters**  
-*baseReconnectQuietTimeSecond* - Number of seconds to start with for progressive backoff on reconnect.  
-*maxReconnectQuietTimeSecond* - Maximum number of seconds for progressive backoff on reconnect.   
+*baseReconnectQuietTimeSecond* - Number of seconds to start with for progressive back-off on reconnect.  
+*maxReconnectQuietTimeSecond* - Maximum number of seconds for progressive back-off on reconnect.   
 *stableConnectionTimeSecond* - Number of seconds for a valid connection to be considered stable.  
 
 <a name="configOfflinePublishQueue"></a>
 ### IoT\_Error\_t configOfflinePublishQueue(unsigned int queueSize, DropBehavior\_t behavior)  
 **Description**  
-Configure the internal queue size and its drop behaivor once the queue is full in the Python runtime on the OpenWRT side. When the client is offline, publish requests will be queued up and get resent once the network connection is back. If the number of publish requests exceeds the maximum size of the queue configued, dropping will happen according the drop behavior configured by this API. More details about offline publish requests queueing can be found [here](#offlinePublishQueueDraining).  
+Configure the internal queue size and its drop behavior once the queue is full in the Python runtime on the OpenWRT side. When the client is offline, publish requests will be queued up and get resent once the network connection is back. If the number of publish requests exceeds the maximum size of the queue configured, dropping will happen according the drop behavior configured by this API. More details about offline publish requests queuing can be found [here](#offlinePublishQueueDraining).  
 
 **Syntax**  
 
 	object.configOfflinePublishQueue(20, DROP_OLDEST); // Configure size of the offline publish requests queue to be 20. Configure the queue to drop the oldest requests once the queue is full.
 	object.configOfflinePublishQueue(20, DROP_NEWEST); // Configure size of the offline publish requests queue to be 20. Configure the queue to drop the newest requests once the queue is full.
 	object.configOfflinePublishQueue(0, DROP_OLDEST); // Configure size of the offline publish requests queue to be infinite. The queue-full drop behavior is ignored when the size if infinite.
+	object.configOfflinePublishQueue(-1, DROP_OLDEST); // Disable the offline publish requests queue. The queue-full drop behavior is ignored when the queue is disabled.
 	
 **Parameters**  
 *queueSize* - The size of the offline publish requests queue, determining how many publish requests can be queued up while the client it offline.  
@@ -241,7 +259,7 @@ Configure the internal queue size and its drop behaivor once the queue is full i
 **Returns**  
 NONE\_ERROR if the configuration is successful.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 CONFIG\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.
 
@@ -260,7 +278,7 @@ Configure the draining interval for requests to be sent out when client is back 
 **Returns**  
 NONE\_ERROR if the configuration is successful.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 CONFIG\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.  
 
@@ -280,7 +298,7 @@ Connect to AWS IoT, using user-specific keepalive setting.
 **Returns**  
 NONE\_ERROR if the connect is successful.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 CONNECT\_SSL\_ERROR if the TLS handshake failed.  
 CONNECT\_ERROR if the connection failed.  
 CONNECT\_TIMEOUT if the connection gets timeout.  
@@ -310,10 +328,11 @@ NONE\_ERROR if the publish is successful.
 NULL\_VALUE\_ERROR if input parameters have NULL value.  
 OVERFLOW\_ERROR if topic/payload exceeds the internal buffer size.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 PUBLISH\_ERROR if the publish failed.  
 PUBLISH\_TIMEOUT if the publish gets timeout.  
 PUBLISH\_QUEUE\_FULL if the internal offline publish requests queue is full.  
+PUBLISH\_QUEUE\_DISABLED if the internal offline publish requests queue is disabled.  
 PUBLISH\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.
 
@@ -337,7 +356,7 @@ NULL\_VALUE\_ERROR if input parameters have NULL value.
 OVERFLOW\_ERROR if topic/payload exceeds the internal buffer size.  
 OUT\_OF\_SKETCH\_SUBSCRIBE\_MEMORY if the number of current subscribe exceeds the configured number in aws\_iot\_config\_SDK.h.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 SUBSCRIBE\_ERROR if the subscribe failed.  
 SUBSCRIBE\_TIMEOUT if the subscribe gets timeout.  
 SUBSCRIBE\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
@@ -360,7 +379,7 @@ NONE\_ERROR if the unsubscribe is successful.
 NULL\_VALUE\_ERROR if input parameters have NULL value.  
 OVERFLOW\_ERROR if topic exceeds the internal buffer size.  
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 UNSUBSCRIBE\_ERROR if the unsubscribe failed.  
 UNSUBSCRIBE\_TIMEOUT if the unsubscribe gets timeout.  
 UNSUBSCRIBE\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
@@ -369,7 +388,7 @@ GENERIC\_ERROR if an unknown error happens.
 <a name="yield"></a>
 ### IoT\_Error\_t yield()
 **Description**  
-Called in the loop to check if there is a new message from all subscribed topics, as well as thing shadow topics. Registered callback functions will be called according to the sequence of messages if there is any. Specifically, unnecessary shadow thing topics (accepted/rejected) will be unsubscribed according to the incoming new messages to free subscribe slots. Users should call this function frequently to receive new messsages and free subscribe slots for new subscribes, especially for shadow thing requests.
+Called in the loop to check if there is a new message from all subscribed topics, as well as thing shadow topics. Registered callback functions will be called according to the sequence of messages if there is any. Specifically, unnecessary shadow thing topics (accepted/rejected) will be unsubscribed according to the incoming new messages to free subscribe slots. Users should call this function frequently to receive new messages and free subscribe slots for new subscribes, especially for shadow thing requests.
  
 **Syntax**
 
@@ -445,11 +464,13 @@ NULL\_VALUE\_ERROR if input parameters have NULL value.
 OVERFLOW\_ERROR if thing name/payload exceeds the internal buffer size.  
 OUT\_OF\_SKETCH\_SUBSCRIBE\_MEMORY if the number of current subscribe exceeds the configured number in aws\_iot\_config\_SDK.h.  
 NO\_SHADOW\_INIT\_ERROR if the shadow with thingName is initialized before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 SUBSCRIBE\_ERROR if the subscribe (accepted/rejected) failed.  
 SUBSCRIBE\_TIMEOUT if the subscribe gets timeout.  
 PUBLISH\_ERROR if the publish (payload) failed.  
 PUBLISH\_TIMEOUT if the publish (payload) gets timeout.  
+PUBLISH\_QUEUE\_FULL if the publish action failed because of a full internal offline publish requests queue.  
+PUBLISH\_QUEUE\_DISABLED if the publish action failed because of a disabled internal offline publish requests queue.  
 SHADOW\_UPDATE\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens. 
 
@@ -473,11 +494,13 @@ NULL\_VALUE\_ERROR if input parameters have NULL value.
 OVERFLOW\_ERROR if thing name exceeds the internal buffer size.  
 OUT\_OF\_SKETCH\_SUBSCRIBE\_MEMORY if the number of current subscribe exceeds the configured number in aws\_iot\_config\_SDK.h.  
 NO\_SHADOW\_INIT\_ERROR if the shadow with thingName is initialized before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 SUBSCRIBE\_ERROR if the subscribe (accepted/rejected) failed.  
 SUBSCRIBE\_TIMEOUT if the subscribe gets timeout.  
 PUBLISH\_ERROR if the publish (payload) failed.  
 PUBLISH\_TIMEOUT if the publish (payload) gets timeout.  
+PUBLISH\_QUEUE\_FULL if the publish action failed because of a full internal offline publish requests queue.  
+PUBLISH\_QUEUE\_DISABLED if the publish action failed because of a disabled internal offline publish requests queue.  
 SHADOW\_GET\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.
 
@@ -501,11 +524,13 @@ NULL\_VALUE\_ERROR if input parameters have NULL value.
 OVERFLOW\_ERROR if thing name exceeds the internal buffer size.  
 OUT\_OF\_SKETCH\_SUBSCRIBE\_MEMORY if the number of current subscribe exceeds the configured number in aws\_iot\_config\_SDK.h.  
 NO\_SHADOW\_INIT\_ERROR if the shadow with thingName is initialized before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 SUBSCRIBE\_ERROR if the subscribe (accepted/rejected) failed.  
 SUBSCRIBE\_TIMEOUT if the subscribe gets timeout.  
 PUBLISH\_ERROR if the publish (payload) failed.  
 PUBLISH\_TIMEOUT if the publish (payload) gets timeout.  
+PUBLISH\_QUEUE\_FULL if the publish action failed because of a full internal offline publish requests queue.  
+PUBLISH\_QUEUE\_DISABLED if the publish action failed because of a disabled internal offline publish requests queue.  
 SHADOW\_DELETE\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
 GENERIC\_ERROR if an unknown error happens.
 
@@ -528,7 +553,7 @@ NULL\_VALUE\_ERROR if input parameters have NULL value.
 OVERFLOW\_ERROR if thing name exceeds the internal buffer size.  
 OUT\_OF\_SKETCH\_SUBSCRIBE\_MEMORY if the number of current subscribe exceeds the configured number in aws\_iot\_config\_SDK.h.  
 NO\_SHADOW\_INIT\_ERROR if the shadow with thingName is initialized before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 SUBSCRIBE\_ERROR if the subscribe (accepted/rejected) failed.  
 SUBSCRIBE\_TIMEOUT if the subscribe gets timeout.  
 SHADOW\_REGISTER\_DELTA\_CALLBACK\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
@@ -551,7 +576,7 @@ NONE\_ERROR if the shadow delta topic is successfully unsubscribed and the callb
 NULL\_VALUE\_ERROR if input parameters have NULL value.  
 OVERFLOW\_ERROR if thing name exceeds the internal buffer size.  
 NO\_SHADOW\_INIT\_ERROR if the shadow with thingName is initialized before this call.  
-WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enought input parameters for this command.  
+WRONG\_PARAMETER\_ERROR if there is an error for the Python Runtime to get enough input parameters for this command.  
 UNSUBSCRIBE\_ERROR if the subscribe (accepted/rejected) failed.  
 UNSUBSCRIBE\_TIMEOUT if the subscribe gets timeout.  
 SHADOW\_UNREGISTER\_DELTA\_CALLBACK\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.  
@@ -567,9 +592,9 @@ Get the value by key in the desired section in the shadow JSON document denoted 
 	object.getDesiredValueByKey("JSON-0", "property1", someBuffer, someBufferSize); // Access JSONDocument["state"]["desired"]["property1"] denoted by JSONIdentifier "JSON-0" and store the value in someBuffer
 	object.getDesiredValueByKey("JSON-0", "property2\"subproperty", someBuffer, someBufferSize); // Access JSONDocument["state"]["desired"]["property2"]["subproperty"] denoted by JSONIdentifier "JSON-0" and store the value in someBuffer 
 
-**Parameteres**  
+**Parameters**  
 *JSONIdentifier* - The JSON Identifier string to access a certain JSON document stored in Python runtime on the OpenWRT side. This is obtained from the registered shadow callback as shadow responses.  
-*key* - The key for dereferencing out the value in the desired section of the JSON document. Nested key can be specified using `"` as the delimiator.  
+*key* - The key for dereferencing out the value in the desired section of the JSON document. Nested key can be specified using `"` as the delimiter.  
 *externalJSONBuf* - Buffer specified by the user to store the incoming value, as string.  
 *bufSize* - Size of the buffer to store the incoming value, as string.  
 
@@ -594,7 +619,7 @@ Get the value by key in the reported section in the shadow JSON document denoted
 
 **Parameters**  
 *JSONIdentifier* - The JSON Identifier string to access a certain JSON document stored in Python runtime on the OpenWRT side. This is obtained from the registered shadow callback as shadow responses.  
-*key* - The key for dereferencing out the value in the reported section of the JSON document. Nested key can be specified using `"` as the delimiator.  
+*key* - The key for dereferencing out the value in the reported section of the JSON document. Nested key can be specified using `"` as the delimiter.  
 *externalJSONBuf* - Buffer specified by the user to store the incoming value, as string.  
 *bufSize* - Size of the buffer to store the incoming value, as string.  
 
@@ -619,7 +644,7 @@ Get the value by key in the state section in the shadow JSON document denoted by
 
 **Parameters**  
 *JSONIdentifier* - The JSON Identifier string to access a certain JSON document stored in Python runtime on the OpenWRT side. This is obtained from the registered shadow callback as shadow responses.  
-*key* - The key for dereferencing out the value in the state section of the JSON document. Nested key can be specified using `"` as the delimiator.  
+*key* - The key for dereferencing out the value in the state section of the JSON document. Nested key can be specified using `"` as the delimiter.  
 *externalJSONBuf* - Buffer specified by the user to store the incoming value, as string.  
 *bufSize* - Size of the buffer to store the incoming value, as string.  
 
@@ -628,7 +653,7 @@ NONE\_ERROR if the value is retrieved successfully.
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
 OVERFLOW\_ERROR if the length of the incoming value exceeds the size of the provided externalJSONBuf.  
 JSON\_FILE\_NOT\_FOUND if the JSON document with the provided JSON identifier does not exist.  
-JSON\_KEY\_NOT\_FOUND if the spedified key does not exist in the JSON document denoted by the provided JSON identifier.  
+JSON\_KEY\_NOT\_FOUND if the specified key does not exist in the JSON document denoted by the provided JSON identifier.  
 JSON\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.   
 GENERIC\_ERROR if an unknown error happens.   
 
@@ -644,7 +669,7 @@ Get the value by key in the shadow JSON document denoted by the provided identif
 
 **Parameters**  
 *JSONIdentifier* - The JSON Identifier string to access a certain JSON document stored in Python runtime on the OpenWRT side. This is obtained from the registered shadow callback as shadow responses.  
-*key* - The key for dereferencing out the value in the JSON document. Nested key can be specified using `"` as the delimiator.  
+*key* - The key for dereferencing out the value in the JSON document. Nested key can be specified using `"` as the delimiter.  
 *externalJSONBuf* - Buffer specified by the user to store the incoming value, as string.  
 *bufSize* - Size of the buffer to store the incoming value, as string.  
 
@@ -653,7 +678,7 @@ NONE\_ERROR if the value is retrieved successfully.
 NO\_SET\_UP\_ERROR if no setup is called before this call.  
 OVERFLOW\_ERROR if the length of the incoming value exceeds the size of the provided externalJSONBuf.  
 JSON\_FILE\_NOT\_FOUND if the JSON document with the provided JSON identifier does not exist.  
-JSON\_KEY\_NOT\_FOUND if the spedified key does not exist in the JSON document denoted by the provided JSON identifier.  
+JSON\_KEY\_NOT\_FOUND if the specified key does not exist in the JSON document denoted by the provided JSON identifier.  
 JSON\_GENERIC\_ERROR if there is an error in executing the command in Python Runtime.   
 GENERIC\_ERROR if an unknown error happens.   
 
@@ -712,13 +737,13 @@ As for shadow operations (Get/Update/Delete) and shadow delta messages, instead 
 
 where i is an integer number.  
 
-Note that there is a limitation on the total number of history JSON documents that can be kept on the OpenWRT side for key/value pair retrival. The limits are:  
+Note that there is a limitation on the total number of history JSON documents that can be kept on the OpenWRT side for key/value pair retrieval. The limits are:  
 
 512 entries for shadow JSON accepted responses  
 512 entries for shadow JSON rejected responses  
 512 entries for shadow JSON delta messages  
 
-Once the limits are exceeded, new incoming shadow JSON documents will overwrite history entries starting from the begining (`JSON-0`, `JSON-1` and `JSON-2`).  
+Once the limits are exceeded, new incoming shadow JSON documents will overwrite history entries starting from the beginning (`JSON-0`, `JSON-1` and `JSON-2`).  
 
 The following APIs are provided for uses to access shadow JSON key value pair from Arduino sketch in an easier manner:  
 [IoT\_Error\_t getDesiredValueByKey(const char\* JSONIdentifier, const char\* key, char\* externalJSONBuf, unsigned int bufSize)](#getDesiredValueByKey)  
@@ -753,7 +778,7 @@ For a typical shadow JSON document (messages for delta), it should look like thi
 
 `getDeltaValueByKey` can be used to access the key value pair in the delta shadow JSON messages.  
 
-More generally, `getValueByKey` can be used to access key value pair in a more generic way where users can specify their own key patterns. Nested JSON key is denoted using `"` as the deliminator.  
+More generally, `getValueByKey` can be used to access key value pair in a more generic way where users can specify their own key patterns. Nested JSON key is denoted using `"` as the delimiter.  
 
 For example, we have the following shadow JSON document with a JSON identifier `JSON-0`:  
 
@@ -778,7 +803,7 @@ To access a series of key value pair, we can use the following function calls:
 	object.getReportedValueByKey("JSON-0", "property3", buffer, bufferSize); // Access JSONDocument["state"]["reported"]["property3"]
 	object.getDesiredValueByKey("JSON-0", "property2\"subproperty", buffer, bufferSize); // Access JSONDocument["state"]["desired"]["property2"]["subproperty"]
 	
-Note that the following two function calls are equivalent. They both accessthe nested JSON key value pair `JSONDocument["state"]["desired"]["property2"]["subproperty"]`:  
+Note that the following two function calls are equivalent. They both access the nested JSON key value pair `JSONDocument["state"]["desired"]["property2"]["subproperty"]`:  
 
 	object.getDesiredValueByKey("JSON-0", "property2\"subproperty", buffer, bufferSize);
 	object.getValueByKey("JSON-0", "state\"desired\"property2\"subproperty", buffer, bufferSize);
@@ -788,27 +813,27 @@ See that `getValueByKey` is a more generic way for shadow JSON key value access.
 For detailed use cases, please check out [Examples](#example).
 
 <a name="progressiveBackoff"></a>
-#### Progressive Reconnect Backoff  
-API is provided to configure the progressive backoff timing parameters:  
+#### Progressive Reconnect Back-off  
+API is provided to configure the progressive back-off timing parameters:  
 [IoT\_Error\_t configBackoffTiming(unsigned int baseReconnectQuietTimeSecond, unsigned int maxReconnectQuietTimeSecond, unsigned int stableConnectionTimeSecond)](#configBackoffTiming)
 
-The auto-reconnect happens with a progressive backoff, which follows the following mechanism for reconnect quiet time:   
+The auto-reconnect happens with a progressive back-off, which follows the following mechanism for reconnect quiet time:   
 
 <h5 align="center">t<sup>current</sup> = min(2<sup>n</sup>t<sup>base</sup>, t<sup>max</sup>),</h5>  
 
 where t<sup>current</sup> is the current reconnect quiet time, t<sup>base</sup> is the base reconnect quiet time, t<sup>max</sup> is the maximum reconnect quiet time.  
 
-The reconnect quiet time will be doubled on disconnect and reconnect attempt util it reaches the preconfigured maximum reconnect quiet time. Once the connection is stable for over the stableConnectionTime, the reconnect quiet time will be reset to the baseReconnectQuietTime.  
+The reconnect quiet time will be doubled on disconnect and reconnect attempt until it reaches the preconfigured maximum reconnect quiet time. Once the connection is stable for over the stableConnectionTime, the reconnect quiet time will be reset to the baseReconnectQuietTime.  
 
-If no `configBackoffTiming` gets called, the following default configuration for backoff timing will be done on `setup` call:  
+If no `configBackoffTiming` gets called, the following default configuration for back-off timing will be done on `setup` call:  
 
 	baseReconnectQuietTimeSecond = 1;
 	maxReconnectQuietTimeSecond = 128;
 	stableConnectionTimeSecond = 20;
 
 <a name="offlinePublishQueueDraining"></a>
-#### Offline publish requests queueing with draining  
-APIs are provided to configure the offline publish requests queueing (size and drop behavior) as well as draining intervals:  
+#### Offline publish requests queuing with draining  
+APIs are provided to configure the offline publish requests queuing (size and drop behavior) as well as draining intervals:  
 [IoT\_Error\_t configOfflinePublishQueue(unsigned int queueSize, DropBehavior\_t behavior)](#configOfflinePublishQueue)  
 [IoT\_Error\_t configDrainingInterval(float numberOfSeconds)](#configDrainingInterval)  
 
@@ -851,7 +876,7 @@ Since the queue is already full, the newest requests `pub_req5` and `pub_req6` a
 
 When the client is back online, connected and resubscribed to all topics that it has previously subscribed to, the draining starts. All requests in the offline publish queue will be resent at the configured draining rate.  
 
-if no `configOfflinePublishQueue` or `configDrainingInterval` is called, the following default configuration for offline publish queueing and draining will be done on setup call:  
+if no `configOfflinePublishQueue` or `configDrainingInterval` is called, the following default configuration for offline publish queuing and draining will be done on setup call:  
 
 	offlinePublishQueueSize = 20
 	dropBehavior = DROP_NEWEST
@@ -859,7 +884,7 @@ if no `configOfflinePublishQueue` or `configDrainingInterval` is called, the fol
 
 Note that before the draining process finishes, any new publish request within this time will be added to the queue. Therefore, draining rate should be higher than the normal publish rate to avoid an endless draining process after reconnect.  
 
-Also note that disconnect event is detected based on PINGRESP MQTT packet loss. Offline publish queueing will NOT be triggered until the disconnect event gets detected. Configuring a shorter keep-alive interval allows the client to detect disconnects more quickly. Any QoS0 publish requests issued after the network failure and before the detection of the PINGRESP loss will be lost.  
+Also note that disconnect event is detected based on PINGRESP MQTT packet loss. Offline publish queuing will NOT be triggered until the disconnect event gets detected. Configuring a shorter keep-alive interval allows the client to detect disconnects more quickly. Any QoS0 publish requests issued after the network failure and before the detection of the PINGRESP loss will be lost.  
 
 <a name="usingthesdk"></a>
 ## Using the SDK
@@ -871,7 +896,7 @@ Also note that disconnect event is detected based on PINGRESP MQTT packet loss. 
 **Make sure you have properly configured SDK settings in `aws_iot_config.h` inside each sketch directory:**
 
 	//===============================================================
-	#define AWS_IOT_MQTT_HOST "data.iot.us-east-1.amazonaws.com" 	// your endpoint
+	#define AWS_IOT_MQTT_HOST "<RANDOM_STRING>.iot.<REGION>.amazonaws.com" 	// your endpoint
 	#define AWS_IOT_MQTT_PORT 8883									// your port, use 443 for MQTT over Websocket
 	#define AWS_IOT_CLIENT_ID	"My_ClientID"						// your client ID
 	#define AWS_IOT_MY_THING_NAME "My_Board"						// your thing name
@@ -995,7 +1020,7 @@ Please make sure to start the example sketch after the board is fully set up and
   	In `setup()`, subscribe to the desired topic and wait for some delay time.
   	
   	  	if((rc = myClient.subscribe("topic1", 1, msg_callback)) != 0) {
-    		Serial.println("Subscribe failed!");
+    		Serial.println(F("Subscribe failed!"));
     		Serial.println(rc);
     	}
     	delay(2000);
@@ -1004,11 +1029,11 @@ Please make sure to start the example sketch after the board is fully set up and
   	
   		sprintf(msg, "new message %d", cnt);
   		if((rc = myClient.publish("topic1", msg, strlen(msg), 1, false)) != 0) {
-  			Serial.println("Publish failed!");
+  			Serial.println(F("Publish failed!"));
   			Serial.println(rc);
   		}
 		if((rc = myClient.yield()) != 0) {
-			Serial.println("Yield failed!");
+			Serial.println(F("Yield failed!"));
 			Serial.println(rc);
 		}
 		...
@@ -1083,7 +1108,7 @@ Please make sure to start the example sketch after the board is fully set up and
 
 ### Simple Thermostat Simulator
 This [example](https://github.com/aws/aws-iot-device-sdk-arduino-yun/tree/master/AWS-IoT-Arduino-Yun-Library/examples/ThermostatSimulatorDevice) demonstrates Arduino Yún as a device accepting instructions and syncing reported state in shadow in AWS IoT, which simulates a thermostat to control the temperature of a room. With the provided example App script, users will be able to get real-time temperature data coming from the board and be able to remotely set the desired temperature. This example also demonstrates how to retrieve shadow JSON data received on Arduino Yún Board.  
-[Eclipse Paho](https://eclipse.org/paho/clients/python/) paho-mqtt python package is used in App scripts for MQTT connections. Users can modify it to use other MQTT library according to their needs.
+[AWS IoT Device SDK for Python](https://github.com/aws/aws-iot-device-sdk-python) is used in App scripts for MQTT connections. Users can modify it to use other MQTT library according to their needs.
 
 * **Hardware Required**  
 Arduino Yún  
@@ -1091,9 +1116,8 @@ Computer connected with Arduino Yún using USB serial and running example App sc
 
 * **Software Required**  
 Tkinter for App GUI  
-Eclipse Paho paho-mqtt python package for MQTT connectivity  
+[AWS IoT Device SDK for Python](https://github.com/aws/aws-iot-device-sdk-python) for MQTT connectivity  
 Example App script, which is included in the `ExampleAppScripts/ThermostatSimulatorApp/`  
-*Note:* You can also use [AWS IoT console](https://aws.amazon.com/iot/) to update the shadow data.
 
 * **Circuit Required**  
 None
@@ -1102,13 +1126,23 @@ None
 Please make sure to start the example sketch after the board is fully set up and openWRT is up and connected to WiFi. See [here](#slowstartup).
 
 * **Getting started**  
-Before proceeding to the following steps, please make sure you have your board set up, with all codebase and credentials properly installed. Please make sure you attach the correct policy to your certificate.  
+Before proceeding to the following steps, please make sure you have your board set up, with all code base and credentials properly installed. Please make sure you attach the correct policy to your certificate.  
   1. Modify your configuration file to match your own credentials and host address.  
   2. Start the sketch when the board boots up. It should pass the initialization steps and then start to update shadow data. It should have a similar display in the serial monitor as follows:<p/>
   <img align="center" src = "https://s3.amazonaws.com/aws-iot-device-sdk-arduino-yun-suppliemental/images/ThermostatSimulatorDevice_sketch.png"/> 
-  3. On the App side, please make sure you have [Tkinter](http://tkinter.unpythonic.net/wiki/How_to_install_Tkinter) and [Eclipse Paho paho-mqtt python package](https://pypi.python.org/pypi/paho-mqtt) pre-installed on your computer.
+  3. On the App side, please make sure you have [Tkinter](http://tkinter.unpythonic.net/wiki/How_to_install_Tkinter) and [AWS IoT Device SDK for Python](https://github.com/aws/aws-iot-device-sdk-python) pre-installed on your computer.
   4. Copy and paste your credentials (certificate, private key and rootCA) into `ThermostatSimulatorApp/certs/`. Please make sure to keep the file names as they are downloaded and make sure the CA file name ends with `CA.crt`.  
-  5. In the directory `ThermostatSimulatorApp/`, start the App script by executing `python ThermostatSimulatorApp.py -h <YOUR HOST ADDRESS>`. You should be able to see a GUI prompt up with default reported temperature:<p/>
+  5. In the directory `ThermostatSimulatorApp/`, start the App script by executing:
+
+  			python ThermostatSimulatorApp.py -e <Your AWS IoT Endpoint>  # For X.509 certificate based mutual authentication
+  			python ThermostatSimulatorApp.py -e <Your AWS IoT Endpoint> -w  # For MQTT over WebSocket using IAM credentials
+  			
+  			
+  		For more details about command line options, you can use the following command:  
+  		
+  			python ThermostatSimulatorApp.py -h
+  		
+  		You should be able to see a GUI prompt up with default reported temperature:<p/>
   <img align="center" src= "https://s3.amazonaws.com/aws-iot-device-sdk-arduino-yun-suppliemental/images/ThermostatSimulatorApp_start.png"/>
   6. Try to input a desired temperature and click <kbd>SET</kbd>. If it succeeds, you should be able to see the desired temperature on the panel and a log printed out in the console space. The board will start continuously syncing temperature settings:<p/>
   <img align="center" src= "https://s3.amazonaws.com/aws-iot-device-sdk-arduino-yun-suppliemental/images/ThermostatSimulatorApp_setTemp.png"/>  
@@ -1147,7 +1181,7 @@ Before proceeding to the following steps, please make sure you have your board s
             else if(reportedTemp - desiredTemp > 0.001) {reportedTemp -= 0.1;}
             dtostrf(reportedTemp, 4, 1, float_buf);
             float_buf[4] = '\0';
-            sprintf(JSON_buf, "{\"state\":{\"reported\":{\"Temp\":%s}}}", float_buf);
+            sprintf_P(JSON_buf, PSTR("{\"state\":{\"reported\":{\"Temp\":%s}}}"), float_buf);
             print_log("shadow update", myClient.shadow_update(AWS_IOT_MY_THING_NAME, JSON_buf, strlen(JSON_buf), NULL, 5));
             if(myClient.yield()) {
               Serial.println("Yield failed.");
@@ -1216,7 +1250,8 @@ The following error codes are defined in `AWS-IoT-Arduino-Yun-Library/aws_iot_er
 		JSON_FILE_NOT_FOUND = -37,
 		JSON_KEY_NOT_FOUND = -38,
 		JSON_GENERIC_ERROR = -39,
-		PUBLISH_QUEUE_FULL = 40
+		PUBLISH_QUEUE_FULL = -40,
+		PUBLISH_QUEUE_DISABLED = -41
 	} IoT_Error_t;
 	
 <a name="support"></a>

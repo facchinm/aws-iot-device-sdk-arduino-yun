@@ -19,18 +19,19 @@ import AWSIoTCommand
 
 
 class commandConfig(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.config(srcHost, srcPort, srcCAFile, srcKey, srcCert)
-    _mqttCoreHandler = None
+    # Target API:
+    # AWSIoTMQTTShadowClient.configureEndpoint(srcHost, srcPort)
+    # AWSIoTMQTTShadowClient.configureCredentials(srcCAFile, srcKey, srcCert)
 
-    def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
+    def __init__(self, srcParameterList, srcSerialCommuteServer, srcShadowClient):
         self._commandProtocolName = "g"
         self._parameterList = srcParameterList
         self._serialCommServerHandler = srcSerialCommuteServer
-        self._mqttCoreHandler = srcMQTTCore
+        self._shadowClientHandler = srcShadowClient
         self._desiredNumberOfParameters = 5
 
     def _validateCommand(self):
-        ret = self._mqttCoreHandler is not None and self._serialCommServerHandler is not None
+        ret = self._shadowClientHandler is not None and self._serialCommServerHandler is not None
         return ret and AWSIoTCommand.AWSIoTCommand._validateCommand(self)
 
     def execute(self):
@@ -39,7 +40,8 @@ class commandConfig(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "G1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.config(self._parameterList[0], int(self._parameterList[1]), self._parameterList[2], self._parameterList[3], self._parameterList[4])
+                self._shadowClientHandler.configureEndpoint(self._parameterList[0], int(self._parameterList[1]))
+                self._shadowClientHandler.configureCredentials(self._parameterList[2], self._parameterList[3], self._parameterList[4])
             except TypeError as e:
                 returnMessage = "G2F: " + str(e.message)
             except Exception as e:

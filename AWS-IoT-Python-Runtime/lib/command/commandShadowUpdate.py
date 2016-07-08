@@ -15,20 +15,18 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import subscribeError
-from AWSIoTExceptions import subscribeTimeoutException
-from AWSIoTExceptions import publishError
-from AWSIoTExceptions import publishTimeoutException
+from core.exception.AWSIoTExceptions import subscribeError
+from core.exception.AWSIoTExceptions import subscribeTimeoutException
+from core.exception.AWSIoTExceptions import publishError
+from core.exception.AWSIoTExceptions import publishTimeoutException
+from core.exception.AWSIoTExceptions import publishQueueFullException
+from core.exception.AWSIoTExceptions import publishQueueDisabledException
 
 
 class commandShadowUpdate(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowUpdate(srcJSONPayload, srcCallback, srcTimeout)
     # Parameters: deviceShadowName, JSONPayload, sketchSubscribeSlot, srcTimeout, callback
-    _shadowRegistrationTable = None
-    _shadowSubscribeRecord = None
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcShadowRegistrationTable, srcShadowSubscribeRecord):
         self._commandProtocolName = "su"
@@ -73,6 +71,10 @@ class commandShadowUpdate(AWSIoTCommand.AWSIoTCommand):
                 returnMessage = "SU6F: " + str(e.message)
             except publishTimeoutException as e:
                 returnMessage = "SU7F: " + str(e.message)
+            except publishQueueFullException as e:
+                returnMessage = "SU8F: " + str(e.message)
+            except publishQueueDisabledException as e:
+                returnMessage = "SU9F: " + str(e.message)
             except Exception as e:
                 returnMessage = "SUFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

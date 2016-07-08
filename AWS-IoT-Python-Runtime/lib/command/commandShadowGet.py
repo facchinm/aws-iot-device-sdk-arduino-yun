@@ -15,20 +15,18 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import subscribeError
-from AWSIoTExceptions import subscribeTimeoutException
-from AWSIoTExceptions import publishError
-from AWSIoTExceptions import publishTimeoutException
+from core.exception.AWSIoTExceptions import subscribeError
+from core.exception.AWSIoTExceptions import subscribeTimeoutException
+from core.exception.AWSIoTExceptions import publishError
+from core.exception.AWSIoTExceptions import publishTimeoutException
+from core.exception.AWSIoTExceptions import publishQueueFullException
+from core.exception.AWSIoTExceptions import publishQueueDisabledException
 
 
 class commandShadowGet(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowGet(srcCallback, srcTimeout)
     # Parameters: deviceShadowName, sketchSubscribeSlot, srcTimeout, callback
-    _shadowRegistrationTable = None
-    _shadowSubscribeRecord = None
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcShadowRegistrationTable, srcShadowSubscribeRecord):
         self._commandProtocolName = "sg"
@@ -71,6 +69,10 @@ class commandShadowGet(AWSIoTCommand.AWSIoTCommand):
                 returnMessage = "SG5F: " + str(e.message)
             except publishTimeoutException as e:
                 returnMessage = "SG6F: " + str(e.message)
+            except publishQueueFullException as e:
+                returnMessage = "SG7F: " + str(e.message)
+            except publishQueueDisabledException as e:
+                returnMessage = "SG8F: " + str(e.message)
             except Exception as e:
                 returnMessage = "SGFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

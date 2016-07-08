@@ -15,17 +15,15 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import publishError
-from AWSIoTExceptions import publishTimeoutException
-from AWSIoTExceptions import publishQueueFullException
+from core.exception.AWSIoTExceptions import publishError
+from core.exception.AWSIoTExceptions import publishTimeoutException
+from core.exception.AWSIoTExceptions import publishQueueFullException
+from core.exception.AWSIoTExceptions import publishQueueDisabledException
 
 
 class commandPublish(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.publish(topic, payload, qos, retain)
-    _mqttCoreHandler = None
+    # Target API: AWSIoTMQTTClient.publish(topic, payload, qos)
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore):
         self._commandProtocolName = "p"
@@ -44,7 +42,8 @@ class commandPublish(AWSIoTCommand.AWSIoTCommand):
             returnMessage = "P1F: " + "No setup."
         else:
             try:
-                self._mqttCoreHandler.publish(self._parameterList[0], self._parameterList[1], int(self._parameterList[2]), self._parameterList[3] == '1')
+                # Retain flag is ignored
+                self._mqttCoreHandler.publish(self._parameterList[0], self._parameterList[1], int(self._parameterList[2]))
             except TypeError as e:
                 returnMessage = "P2F: " + str(e.message)
             except publishError as e:
@@ -53,6 +52,8 @@ class commandPublish(AWSIoTCommand.AWSIoTCommand):
                 returnMessage = "P4F: " + str(e.message)
             except publishQueueFullException as e:
                 returnMessage = "P5F: " + str(e.message)
+            except publishQueueDisabledException as e:
+                returnMessage = "P6F: " + str(e.message)
             except Exception as e:
                 returnMessage = "PFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

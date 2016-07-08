@@ -19,6 +19,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "ctype.h"
+#include "avr/pgmspace.h"
 
 #define LINUX_BAUD_DEFAULT 250000
 #define LINUX_BAUD_LININO 115200
@@ -27,19 +28,25 @@
 #define MAX_NUM_PARA 6 // Maximum number of parameters in protocol communication
 #define NUM_ATTEMPT_BEFORE_EXIT MAX_NUM_PARA/2+1 // Number of '~' to fully exit the protocol command
 
-const char* OUT_OF_BUFFER_ERR_MSG = "OUT OF BUFFER SIZE";
-const char* EMPTY_STRING = "";
+// PGM_P is defined as const char*
+// Helper string constants
+PGM_P OUT_OF_BUFFER_ERR_MSG = "OUT OF BUFFER SIZE";
+PGM_P EMPTY_STRING = "";
+// Internal non-protocol commands
+PGM_P CMD_CHECK_LINUX_LIVE = "uname\n";
+PGM_P CMD_CD_TO_PY_RUNTIME = "cd /root/AWS-IoT-Python-Runtime/runtime/\n";
+PGM_P CMD_START_PY_RUNTIME = "python run.py\n";
 
 // Choose different baudrate for different version of openWRT OS
 Baud_t aws_iot_mqtt_client::find_baud_type() {
 	Baud_t rc_type = BAUD_TYPE_UNKNOWN;
 	// 1st attempt
 	clearProtocolOnSerialBegin(LINUX_BAUD_DEFAULT);
-	exec_cmd("uname\n", true, false); // check OS version
-	if(strncmp(rw_buf, "Linux", 5) != 0) { // Not an Arduino?
+	exec_cmd(CMD_CHECK_LINUX_LIVE, true, false); // check OS version
+	if(strncmp_P(rw_buf, PSTR("Linux"), 5) != 0) { // Not an Arduino?
 		clearProtocolOnSerialBegin(LINUX_BAUD_LININO);
-		exec_cmd("uname\n", true, false); // check OS version
-		if(strncmp(rw_buf, "Linux", 5) != 0) {
+		exec_cmd(CMD_CHECK_LINUX_LIVE, true, false); // check OS version
+		if(strncmp_P(rw_buf, PSTR("Linux"), 5) != 0) {
 			// No more board types to try
 		}
 		else {rc_type = BAUD_TYPE_LININO;}
@@ -52,31 +59,31 @@ Baud_t aws_iot_mqtt_client::find_baud_type() {
 IoT_Error_t aws_iot_mqtt_client::setup_exec(const char* client_id, bool clean_session, MQTTv_t MQTT_version, bool useWebsocket) {
 	// Serial1 is started before this call
 	IoT_Error_t rc = NONE_ERROR;
-	exec_cmd("cd /root/AWS-IoT-Python-Runtime/runtime/\n", false, false);
-	exec_cmd("python run.py\n", false, false);
+	exec_cmd(CMD_CD_TO_PY_RUNTIME, false, false);
+	exec_cmd(CMD_START_PY_RUNTIME, false, false);
 
 	// Create obj
 	exec_cmd("5\n", false, false);
 
 	exec_cmd("i\n", false, false);
 
-	sprintf(rw_buf, "%s\n", client_id);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), client_id);
 	exec_cmd(rw_buf, false, false);
 
 	int num_temp = clean_session ? 1 : 0;
-	sprintf(rw_buf, "%d\n", num_temp);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), num_temp);
 	exec_cmd(rw_buf, false, false);
 
-	sprintf(rw_buf, "%u\n", MQTT_version);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%u\n"), MQTT_version);
 	exec_cmd(rw_buf, false, false);
 
 	// Websocket flag
 	num_temp = useWebsocket ? 1 : 0;
-	sprintf(rw_buf, "%d\n", num_temp);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), num_temp);
 	exec_cmd(rw_buf, true, false);
 
-	if(strncmp(rw_buf, "I T", 3) != 0) {
-		if(strncmp(rw_buf, "I F", 3) == 0) {rc = SET_UP_ERROR;}
+	if(strncmp_P(rw_buf, PSTR("I T"), 3) != 0) {
+		if(strncmp_P(rw_buf, PSTR("I F"), 3) == 0) {rc = SET_UP_ERROR;}
 		else rc = GENERIC_ERROR;
 	}
 
@@ -112,36 +119,35 @@ IoT_Error_t aws_iot_mqtt_client::config(const char* host, unsigned int port, con
 	else if(keyfile_path != NULL && strlen(keyfile_path) >= MAX_BUF_SIZE) {rc = OVERFLOW_ERROR;}
 	else if(certfile_path != NULL && strlen(certfile_path) >= MAX_BUF_SIZE) {rc = OVERFLOW_ERROR;}
 	else {
-		const char* helper = "";
-		const char* placeholder = "";
+		PGM_P helper = "";
 
 		exec_cmd("6\n", false, false);
 
 		exec_cmd("g\n", false, false);
 
-		helper = host == NULL ? placeholder : host;
-		sprintf(rw_buf, "%s\n", helper);
+		helper = host == NULL ? EMPTY_STRING : host;
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), helper);
 		exec_cmd(rw_buf, false, false);
 
-		sprintf(rw_buf, "%d\n", port);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), port);
 		exec_cmd(rw_buf, false, false);
 
-		helper = cafile_path == NULL ? placeholder : cafile_path;
-		sprintf(rw_buf, "%s\n", helper);
+		helper = cafile_path == NULL ? EMPTY_STRING : cafile_path;
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), helper);
 		exec_cmd(rw_buf, false, false);
 
-		helper = keyfile_path == NULL ? placeholder : keyfile_path;
-		sprintf(rw_buf, "%s\n", helper);
+		helper = keyfile_path == NULL ? EMPTY_STRING : keyfile_path;
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), helper);
 		exec_cmd(rw_buf, false, false);
 
-		helper = certfile_path == NULL ? placeholder : certfile_path;
-		sprintf(rw_buf, "%s\n", helper);
+		helper = certfile_path == NULL ? EMPTY_STRING : certfile_path;
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), helper);
 		exec_cmd(rw_buf, true, false);
 
-		if(strncmp(rw_buf, "G T", 3) != 0) {
-			if(strncmp(rw_buf, "G1F", 3) == 0) {rc = NO_SET_UP_ERROR;}
-			else if(strncmp(rw_buf, "G2F", 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
-			else if(strncmp(rw_buf, "GFF", 3) == 0) {rc = CONFIG_GENERIC_ERROR;}
+		if(strncmp_P(rw_buf, PSTR("G T"), 3) != 0) {
+			if(strncmp_P(rw_buf, PSTR("G1F"), 3) == 0) {rc = NO_SET_UP_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("G2F"), 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("GFF"), 3) == 0) {rc = CONFIG_GENERIC_ERROR;}
 			else rc = GENERIC_ERROR;
 		}
 	}
@@ -156,20 +162,20 @@ IoT_Error_t aws_iot_mqtt_client::configBackoffTiming(unsigned int baseReconnectQ
 
 	exec_cmd("bf\n", false, false);
 
-	sprintf(rw_buf, "%d\n", baseReconnectQuietTimeSecond);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), baseReconnectQuietTimeSecond);
 	exec_cmd(rw_buf, false, false);
 
-	sprintf(rw_buf, "%d\n", maxReconnectQuietTimeSecond);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), maxReconnectQuietTimeSecond);
 	exec_cmd(rw_buf, false, false);
 
-	sprintf(rw_buf, "%d\n", stableConnectionTimeSecond);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), stableConnectionTimeSecond);
 	exec_cmd(rw_buf, true, false);
 
-	if(strncmp(rw_buf, "BF T", 4) != 0) {
-		if(strncmp(rw_buf, "BF1F", 4) == 0) {rc = NO_SET_UP_ERROR;}
-		else if(strncmp(rw_buf, "BF2F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "BF3F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "BFFF", 4) == 0) {rc = CONFIG_GENERIC_ERROR;}
+	if(strncmp_P(rw_buf, PSTR("BF T"), 4) != 0) {
+		if(strncmp_P(rw_buf, PSTR("BF1F"), 4) == 0) {rc = NO_SET_UP_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("BF2F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("BF3F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("BFFF"), 4) == 0) {rc = CONFIG_GENERIC_ERROR;}
 		else rc = GENERIC_ERROR;
 	}
 
@@ -183,18 +189,18 @@ IoT_Error_t aws_iot_mqtt_client::configOfflinePublishQueue(unsigned int queueSiz
 
 	exec_cmd("pq\n", false, false);
 
-	sprintf(rw_buf, "%d\n", queueSize);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), queueSize);
 	exec_cmd(rw_buf, false, false);
 
 
-	sprintf(rw_buf, "%d\n", behavior);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), behavior);
 	exec_cmd(rw_buf, true, false);
 
-	if(strncmp(rw_buf, "PQ T", 4) != 0) {
-		if(strncmp(rw_buf, "PQ1F", 4) == 0) {rc = NO_SET_UP_ERROR;}
-		else if(strncmp(rw_buf, "PQ2F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "PQ3F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "PQFF", 4) == 0) {rc = CONFIG_GENERIC_ERROR;}
+	if(strncmp_P(rw_buf, PSTR("PQ T"), 4) != 0) {
+		if(strncmp_P(rw_buf, PSTR("PQ1F"), 4) == 0) {rc = NO_SET_UP_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("PQ2F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("PQ3F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("PQFF"), 4) == 0) {rc = CONFIG_GENERIC_ERROR;}
 		else rc = GENERIC_ERROR;
 	}
 
@@ -212,11 +218,11 @@ IoT_Error_t aws_iot_mqtt_client::configDrainingInterval(float numberOfSeconds) {
 	strcat(rw_buf, "\n");
 	exec_cmd(rw_buf, true, false);
 
-	if(strncmp(rw_buf, "DI T", 4) != 0) {
-		if(strncmp(rw_buf, "DI1F", 4) == 0) {rc = NO_SET_UP_ERROR;}
-		else if(strncmp(rw_buf, "DI2F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "DI3F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "DIFF", 4) == 0) {rc = CONFIG_GENERIC_ERROR;}
+	if(strncmp_P(rw_buf, PSTR("DI T"), 4) != 0) {
+		if(strncmp_P(rw_buf, PSTR("DI1F"), 4) == 0) {rc = NO_SET_UP_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("DI2F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("DI3F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("DIFF"), 4) == 0) {rc = CONFIG_GENERIC_ERROR;}
 		else rc = GENERIC_ERROR;
 	}
 
@@ -229,18 +235,18 @@ IoT_Error_t aws_iot_mqtt_client::connect(unsigned int keepalive_interval) {
 
 	exec_cmd("c\n", false, false);
 
-	sprintf(rw_buf, "%d\n", keepalive_interval);
+	snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), keepalive_interval);
 	exec_cmd(rw_buf, true, false);
 
-	if(strncmp(rw_buf, "C T", 3) != 0) {
-		if(strncmp(rw_buf, "C1F", 3) == 0) {rc = NO_SET_UP_ERROR;}
-		else if(strncmp(rw_buf, "C2F", 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
-		else if(strncmp(rw_buf, "C3F", 3) == 0) {rc = CONNECT_SSL_ERROR;}
-		else if(strncmp(rw_buf, "C4F", 3) == 0) {rc = CONNECT_ERROR;}
-		else if(strncmp(rw_buf, "C5F", 3) == 0) {rc = CONNECT_TIMEOUT;}
-		else if(strncmp(rw_buf, "C6F", 3) == 0) {rc = CONNECT_CREDENTIAL_NOT_FOUND;}
-		else if(strncmp(rw_buf, "C7F", 3) == 0) {rc = WEBSOCKET_CREDENTIAL_NOT_FOUND;}
-		else if(strncmp(rw_buf, "CFF", 3) == 0) {rc = CONNECT_GENERIC_ERROR;}
+	if(strncmp_P(rw_buf, PSTR("C T"), 3) != 0) {
+		if(strncmp_P(rw_buf, PSTR("C1F"), 3) == 0) {rc = NO_SET_UP_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("C2F"), 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("C3F"), 3) == 0) {rc = CONNECT_SSL_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("C4F"), 3) == 0) {rc = CONNECT_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("C5F"), 3) == 0) {rc = CONNECT_TIMEOUT;}
+		else if(strncmp_P(rw_buf, PSTR("C6F"), 3) == 0) {rc = CONNECT_CREDENTIAL_NOT_FOUND;}
+		else if(strncmp_P(rw_buf, PSTR("C7F"), 3) == 0) {rc = WEBSOCKET_CREDENTIAL_NOT_FOUND;}
+		else if(strncmp_P(rw_buf, PSTR("CFF"), 3) == 0) {rc = CONNECT_GENERIC_ERROR;}
 		else rc = GENERIC_ERROR;
 	}
 
@@ -256,26 +262,27 @@ IoT_Error_t aws_iot_mqtt_client::publish(const char* topic, const char* payload,
 
 		exec_cmd("p\n", false, false);
 
-		sprintf(rw_buf, "%s\n", topic);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), topic);
 		exec_cmd(rw_buf, false, false);
 
-		sprintf(rw_buf, "%s\n", payload);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), payload);
 		exec_cmd(rw_buf, false, false);
 
-		sprintf(rw_buf, "%d\n", qos);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), qos);
 		exec_cmd(rw_buf, false, false);
 
 		int num_temp = retain ? 1 : 0;
-		sprintf(rw_buf, "%d\n", num_temp);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), num_temp);
 		exec_cmd(rw_buf, true, false);
 
-		if(strncmp(rw_buf, "P T", 3) != 0) {
-			if(strncmp(rw_buf, "P1F", 3) == 0) {rc = NO_SET_UP_ERROR;}
-			else if(strncmp(rw_buf, "P2F", 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
-			else if(strncmp(rw_buf, "P3F", 3) == 0) {rc = PUBLISH_ERROR;}
-			else if(strncmp(rw_buf, "P4F", 3) == 0) {rc = PUBLISH_TIMEOUT;}
-			else if(strncmp(rw_buf, "P5F", 3) == 0) {rc = PUBLISH_QUEUE_FULL;}
-			else if(strncmp(rw_buf, "PFF", 3) == 0) {rc = PUBLISH_GENERIC_ERROR;}
+		if(strncmp_P(rw_buf, PSTR("P T"), 3) != 0) {
+			if(strncmp_P(rw_buf, PSTR("P1F"), 3) == 0) {rc = NO_SET_UP_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("P2F"), 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("P3F"), 3) == 0) {rc = PUBLISH_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("P4F"), 3) == 0) {rc = PUBLISH_TIMEOUT;}
+			else if(strncmp_P(rw_buf, PSTR("P5F"), 3) == 0) {rc = PUBLISH_QUEUE_FULL;}
+			else if(strncmp_P(rw_buf, PSTR("P6F"), 3) == 0) {rc = PUBLISH_QUEUE_DISABLED;}
+			else if(strncmp_P(rw_buf, PSTR("PFF"), 3) == 0) {rc = PUBLISH_GENERIC_ERROR;}
 			else rc = GENERIC_ERROR;
 		}
 	}
@@ -294,26 +301,26 @@ IoT_Error_t aws_iot_mqtt_client::subscribe(const char* topic, unsigned int qos, 
 
 			exec_cmd("s\n", false, false);
 
-			sprintf(rw_buf, "%s\n", topic);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), topic);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", qos);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), qos);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", i); // ino_id
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), i); // ino_id
 			exec_cmd(rw_buf, true, false);
 
-			if(strncmp(rw_buf, "S T", 3) == 0) {
+			if(strncmp_P(rw_buf, PSTR("S T"), 3) == 0) {
 				sub_group[i].is_used = true;
 				sub_group[i].is_shadow_gud = false;
 				sub_group[i].callback = cb;
 			}
 			else {
-				if(strncmp(rw_buf, "S1F", 3) == 0) {rc = NO_SET_UP_ERROR;}
-				else if(strncmp(rw_buf, "S2F", 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
-				else if(strncmp(rw_buf, "S3F", 3) == 0) {rc = SUBSCRIBE_ERROR;}
-				else if(strncmp(rw_buf, "S4F", 3) == 0) {rc = SUBSCRIBE_TIMEOUT;}
-				else if(strncmp(rw_buf, "SFF", 3) == 0) {rc = SUBSCRIBE_GENERIC_ERROR;}
+				if(strncmp_P(rw_buf, PSTR("S1F"), 3) == 0) {rc = NO_SET_UP_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("S2F"), 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("S3F"), 3) == 0) {rc = SUBSCRIBE_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("S4F"), 3) == 0) {rc = SUBSCRIBE_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SFF"), 3) == 0) {rc = SUBSCRIBE_GENERIC_ERROR;}
 				else rc = GENERIC_ERROR;
 			}
 		}
@@ -331,11 +338,11 @@ IoT_Error_t aws_iot_mqtt_client::unsubscribe(const char* topic) {
 
 		exec_cmd("u\n", false, false);
 
-		sprintf(rw_buf, "%s\n", topic);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), topic);
 		exec_cmd(rw_buf, true, false);
 
 		// Unsubscribe to a topic never subscribed, ignore
-		if(strncmp(rw_buf, "U T", 3) == 0) {rc = NONE_ERROR;}
+		if(strncmp_P(rw_buf, PSTR("U T"), 3) == 0) {rc = NONE_ERROR;}
 		else {
 			char* saveptr;
 			char* p;
@@ -348,11 +355,11 @@ IoT_Error_t aws_iot_mqtt_client::unsubscribe(const char* topic) {
 				sub_group[ino_id].is_shadow_gud = false;
 				sub_group[ino_id].callback = NULL;
 			}
-			else if(strncmp(rw_buf, "U1F", 3) == 0) {rc = NO_SET_UP_ERROR;}
-			else if(strncmp(rw_buf, "U2F", 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
-			else if(strncmp(rw_buf, "U3F", 3) == 0) {rc = UNSUBSCRIBE_ERROR;}
-			else if(strncmp(rw_buf, "U4F", 3) == 0) {rc = UNSUBSCRIBE_TIMEOUT;}
-			else if(strncmp(rw_buf, "UFF", 3) == 0) {rc = UNSUBSCRIBE_GENERIC_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("U1F"), 3) == 0) {rc = NO_SET_UP_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("U2F"), 3) == 0) {rc = WRONG_PARAMETER_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("U3F"), 3) == 0) {rc = UNSUBSCRIBE_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("U4F"), 3) == 0) {rc = UNSUBSCRIBE_TIMEOUT;}
+			else if(strncmp_P(rw_buf, PSTR("UFF"), 3) == 0) {rc = UNSUBSCRIBE_GENERIC_ERROR;}
 			else rc = GENERIC_ERROR;
 		}
 	}
@@ -363,12 +370,12 @@ IoT_Error_t aws_iot_mqtt_client::yield() {
 	IoT_Error_t rc = NONE_ERROR;
 	exec_cmd("1\n", false, false);
 	exec_cmd("z\n", true, false); // tell the python runtime to lock the current msg queue size
-	if(strncmp(rw_buf, "Z T", 3) != 0) {rc = YIELD_ERROR;} // broken protocol
+	if(strncmp_P(rw_buf, PSTR("Z T"), 3) != 0) {rc = YIELD_ERROR;} // broken protocol
 	else { // start the BIG yield loop
 		while(true) {
 			exec_cmd("1\n", false, false);
 			exec_cmd("y\n", true, false);
-			if(strncmp(rw_buf, "Y F", 3) == 0) {break;}
+			if(strncmp_P(rw_buf, PSTR("Y F"), 3) == 0) {break;}
 			if(rw_buf[0] != 'Y') { // filter out garbage feedback
 				rc = YIELD_ERROR;
 				break;
@@ -406,7 +413,7 @@ IoT_Error_t aws_iot_mqtt_client::yield() {
 									if(rc == NONE_ERROR) {
 										if(sub_group[ino_id].is_shadow_gud) {
 											// See if it is timeout
-											if(strncmp(msg_buf, "JSON-X", 6) == 0) {sub_group[ino_id].callback(msg_buf, (unsigned int)strlen(msg_buf), STATUS_SHADOW_TIMEOUT);}
+											if(strncmp_P(msg_buf, PSTR("JSON-X"), 6) == 0) {sub_group[ino_id].callback(msg_buf, (unsigned int)strlen(msg_buf), STATUS_SHADOW_TIMEOUT);}
 											else {
 												// See if it is accepted/rejected
 												// Delta is treated as normal MQTT messages
@@ -422,7 +429,7 @@ IoT_Error_t aws_iot_mqtt_client::yield() {
 										else {sub_group[ino_id].callback(msg_buf, (unsigned int)strlen(msg_buf), STATUS_NORMAL);}
 									}
 									if(rc == OVERFLOW_ERROR) {
-										sub_group[ino_id].callback((char*)OUT_OF_BUFFER_ERR_MSG, (unsigned int)strlen(OUT_OF_BUFFER_ERR_MSG), STATUS_MESSAGE_OVERFLOW);
+										sub_group[ino_id].callback((char*)(OUT_OF_BUFFER_ERR_MSG), (unsigned int)strlen(OUT_OF_BUFFER_ERR_MSG), STATUS_MESSAGE_OVERFLOW);
 									}
 								}
 								// always free the shadow slot and recover the context
@@ -458,11 +465,11 @@ IoT_Error_t aws_iot_mqtt_client::disconnect() {
 
 	exec_cmd("d\n", true, false);
 
-	if(strncmp(rw_buf, "D T", 3) != 0) {
-		if(strncmp(rw_buf, "D1F", 3) == 0) {rc = NO_SET_UP_ERROR;}
-		else if(strncmp(rw_buf, "D2F", 3) == 0) {rc = DISCONNECT_ERROR;}
-		else if(strncmp(rw_buf, "D3F", 3) == 0) {rc = DISCONNECT_TIMEOUT;}
-		else if(strncmp(rw_buf, "DFF", 3) == 0) {rc = DISCONNECT_GENERIC_ERROR;}
+	if(strncmp_P(rw_buf, PSTR("D T"), 3) != 0) {
+		if(strncmp_P(rw_buf, PSTR("D1F"), 3) == 0) {rc = NO_SET_UP_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("D2F"), 3) == 0) {rc = DISCONNECT_ERROR;}
+		else if(strncmp_P(rw_buf, PSTR("D3F"), 3) == 0) {rc = DISCONNECT_TIMEOUT;}
+		else if(strncmp_P(rw_buf, PSTR("DFF"), 3) == 0) {rc = DISCONNECT_GENERIC_ERROR;}
 		else rc = GENERIC_ERROR;
 	}
 	return rc;
@@ -478,13 +485,13 @@ IoT_Error_t aws_iot_mqtt_client::shadow_init(const char* thingName) {
 
 		exec_cmd("si\n", false, false);
 
-		sprintf(rw_buf, "%s\n", thingName);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), thingName);
 		exec_cmd(rw_buf, false, false);
 
 		exec_cmd("1\n", true, false); // isPersistentSubscribe, always true
 
-		if(strncmp(rw_buf, "SI T", 4) != 0) {
-			if(strncmp(rw_buf, "SI F", 4) == 0) {rc = SHADOW_INIT_ERROR;}
+		if(strncmp_P(rw_buf, PSTR("SI T"), 4) != 0) {
+			if(strncmp_P(rw_buf, PSTR("SI F"), 4) == 0) {rc = SHADOW_INIT_ERROR;}
 			else rc = GENERIC_ERROR;
 		}
 	}
@@ -503,22 +510,22 @@ IoT_Error_t aws_iot_mqtt_client::shadow_register_delta_func(const char* thingNam
 
 			exec_cmd("s_rd\n", false, false);
 
-			sprintf(rw_buf, "%s\n", thingName);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), thingName);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", i);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), i);
 			exec_cmd(rw_buf, true, false);
 
-			if(strncmp(rw_buf, "S_RD T", 6) == 0) {
+			if(strncmp_P(rw_buf, PSTR("S_RD T"), 6) == 0) {
 				sub_group[i].is_used = true;
 				sub_group[i].callback = cb;
 			}
 			else {
-				if(strncmp(rw_buf, "S_RD1F", 6) == 0) {rc = NO_SHADOW_INIT_ERROR;}
-				else if(strncmp(rw_buf, "S_RD2F", 6) == 0) {rc = WRONG_PARAMETER_ERROR;}
-				else if(strncmp(rw_buf, "S_RD3F", 6) == 0) {rc = SUBSCRIBE_ERROR;}
-				else if(strncmp(rw_buf, "S_RD4F", 6) == 0) {rc = SUBSCRIBE_TIMEOUT;}
-				else if(strncmp(rw_buf, "S_RDFF", 6) == 0) {rc = SHADOW_REGISTER_DELTA_CALLBACK_GENERIC_ERROR;}
+				if(strncmp_P(rw_buf, PSTR("S_RD1F"), 6) == 0) {rc = NO_SHADOW_INIT_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("S_RD2F"), 6) == 0) {rc = WRONG_PARAMETER_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("S_RD3F"), 6) == 0) {rc = SUBSCRIBE_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("S_RD4F"), 6) == 0) {rc = SUBSCRIBE_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("S_RDFF"), 6) == 0) {rc = SHADOW_REGISTER_DELTA_CALLBACK_GENERIC_ERROR;}
 				else rc = GENERIC_ERROR;
 			}
 		}
@@ -535,11 +542,11 @@ IoT_Error_t aws_iot_mqtt_client::shadow_unregister_delta_func(const char* thingN
 
 		exec_cmd("s_ud\n", false, false);
 
-		sprintf(rw_buf, "%s\n", thingName);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), thingName);
 		exec_cmd(rw_buf, true, false);
 
 		// Unsubscribe to a topic never subscribed, ignore
-		if(strncmp(rw_buf, "S_UD T", 6) == 0) {rc = NONE_ERROR;}
+		if(strncmp_P(rw_buf, PSTR("S_UD T"), 6) == 0) {rc = NONE_ERROR;}
 		else {
 			char* saveptr;
 			char* p;
@@ -551,11 +558,11 @@ IoT_Error_t aws_iot_mqtt_client::shadow_unregister_delta_func(const char* thingN
 				sub_group[ino_id].is_used = false;
 				sub_group[ino_id].callback = NULL;
 			}
-			else if(strncmp(rw_buf, "S_UD1F", 6) == 0) {rc = NO_SHADOW_INIT_ERROR;}
-			else if(strncmp(rw_buf, "S_UD2F", 6) == 0) {rc = WRONG_PARAMETER_ERROR;}
-			else if(strncmp(rw_buf, "S_UD3F", 6) == 0) {rc = UNSUBSCRIBE_ERROR;}
-			else if(strncmp(rw_buf, "S_UD4F", 6) == 0) {rc = UNSUBSCRIBE_TIMEOUT;}
-			else if(strncmp(rw_buf, "S_UDFF", 6) == 0) {rc = SHADOW_UNREGISTER_DELTA_CALLBACK_GENERIC_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("S_UD1F"), 6) == 0) {rc = NO_SHADOW_INIT_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("S_UD2F"), 6) == 0) {rc = WRONG_PARAMETER_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("S_UD3F"), 6) == 0) {rc = UNSUBSCRIBE_ERROR;}
+			else if(strncmp_P(rw_buf, PSTR("S_UD4F"), 6) == 0) {rc = UNSUBSCRIBE_TIMEOUT;}
+			else if(strncmp_P(rw_buf, PSTR("S_UDFF"), 6) == 0) {rc = SHADOW_UNREGISTER_DELTA_CALLBACK_GENERIC_ERROR;}
 			else rc = GENERIC_ERROR;
 		}
 	}
@@ -574,28 +581,30 @@ IoT_Error_t aws_iot_mqtt_client::shadow_get(const char* thingName, message_callb
 
 			exec_cmd("sg\n", false, false);
 
-			sprintf(rw_buf, "%s\n", thingName);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), thingName);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", i);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), i);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", timeout);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), timeout);
 			exec_cmd(rw_buf, true, false);
 	        
-			if(strncmp(rw_buf, "SG T", 4) == 0) {
+			if(strncmp_P(rw_buf, PSTR("SG T"), 4) == 0) {
 				sub_group[i].is_used = true;
 				sub_group[i].is_shadow_gud = true;
 				sub_group[i].callback = cb;
 			}
 			else {
-				if(strncmp(rw_buf, "SG1F", 4) == 0) {rc = NO_SHADOW_INIT_ERROR;}
-				else if(strncmp(rw_buf, "SG2F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-				else if(strncmp(rw_buf, "SG3F", 4) == 0) {rc = SUBSCRIBE_ERROR;}
-				else if(strncmp(rw_buf, "SG4F", 4) == 0) {rc = SUBSCRIBE_TIMEOUT;}
-				else if(strncmp(rw_buf, "SG5F", 4) == 0) {rc = PUBLISH_ERROR;}
-				else if(strncmp(rw_buf, "SG6F", 4) == 0) {rc = PUBLISH_TIMEOUT;}
-				else if(strncmp(rw_buf, "SGFF", 4) == 0) {rc = SHADOW_GET_GENERIC_ERROR;}
+				if(strncmp_P(rw_buf, PSTR("SG1F"), 4) == 0) {rc = NO_SHADOW_INIT_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SG2F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SG3F"), 4) == 0) {rc = SUBSCRIBE_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SG4F"), 4) == 0) {rc = SUBSCRIBE_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SG5F"), 4) == 0) {rc = PUBLISH_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SG6F"), 4) == 0) {rc = PUBLISH_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SG7F"), 4) == 0) {rc = PUBLISH_QUEUE_FULL;}
+				else if(strncmp_P(rw_buf, PSTR("SG8F"), 4) == 0) {rc = PUBLISH_QUEUE_DISABLED;}
+				else if(strncmp_P(rw_buf, PSTR("SGFF"), 4) == 0) {rc = SHADOW_GET_GENERIC_ERROR;}
 				else rc = GENERIC_ERROR;
 			}
 		}
@@ -616,32 +625,34 @@ IoT_Error_t aws_iot_mqtt_client::shadow_update(const char* thingName, const char
 
 			exec_cmd("su\n", false, false);
 
-			sprintf(rw_buf, "%s\n", thingName);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), thingName);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%s\n", payload);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), payload);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", i);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), i);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", timeout);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), timeout);
 			exec_cmd(rw_buf, true, false);
 
-			if(strncmp(rw_buf, "SU T", 4) == 0) {
+			if(strncmp_P(rw_buf, PSTR("SU T"), 4) == 0) {
 				sub_group[i].is_used = true;
 				sub_group[i].is_shadow_gud = true;
 				sub_group[i].callback = cb;
 			}
 			else {
-				if(strncmp(rw_buf, "SU1F", 4) == 0) {rc = NO_SHADOW_INIT_ERROR;}
-				else if(strncmp(rw_buf, "SU2F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-				else if(strncmp(rw_buf, "SU3F", 4) == 0) {rc = SHADOW_UPDATE_INVALID_JSON_ERROR;}
-				else if(strncmp(rw_buf, "SU4F", 4) == 0) {rc = SUBSCRIBE_ERROR;}
-				else if(strncmp(rw_buf, "SU5F", 4) == 0) {rc = SUBSCRIBE_TIMEOUT;}
-				else if(strncmp(rw_buf, "SU6F", 4) == 0) {rc = PUBLISH_ERROR;}
-				else if(strncmp(rw_buf, "SU7F", 4) == 0) {rc = PUBLISH_TIMEOUT;}
-				else if(strncmp(rw_buf, "SUFF", 4) == 0) {rc = SHADOW_UPDATE_GENERIC_ERROR;}
+				if(strncmp_P(rw_buf, PSTR("SU1F"), 4) == 0) {rc = NO_SHADOW_INIT_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SU2F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SU3F"), 4) == 0) {rc = SHADOW_UPDATE_INVALID_JSON_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SU4F"), 4) == 0) {rc = SUBSCRIBE_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SU5F"), 4) == 0) {rc = SUBSCRIBE_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SU6F"), 4) == 0) {rc = PUBLISH_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SU7F"), 4) == 0) {rc = PUBLISH_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SU8F"), 4) == 0) {rc = PUBLISH_QUEUE_FULL;}
+				else if(strncmp_P(rw_buf, PSTR("SU9F"), 4) == 0) {rc = PUBLISH_QUEUE_DISABLED;}
+				else if(strncmp_P(rw_buf, PSTR("SUFF"), 4) == 0) {rc = SHADOW_UPDATE_GENERIC_ERROR;}
 				else rc = GENERIC_ERROR;
 			}
 		}	        
@@ -662,27 +673,29 @@ IoT_Error_t aws_iot_mqtt_client::shadow_delete(const char* thingName, message_ca
 
 			exec_cmd("sd\n", false, false);
 
-			sprintf(rw_buf, "%s\n", thingName);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), thingName);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", i);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), i);
 			exec_cmd(rw_buf, false, false);
 
-			sprintf(rw_buf, "%d\n", timeout);
+			snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), timeout);
 			exec_cmd(rw_buf, true, false);
-			if(strncmp(rw_buf, "SD T", 4) == 0) {
+			if(strncmp_P(rw_buf, PSTR("SD T"), 4) == 0) {
 				sub_group[i].is_used = true;
 				sub_group[i].is_shadow_gud = true;
 				sub_group[i].callback = cb;
 			}
 			else {
-				if(strncmp(rw_buf, "SD1F", 4) == 0) {rc = NO_SHADOW_INIT_ERROR;}
-				else if(strncmp(rw_buf, "SD2F", 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
-				else if(strncmp(rw_buf, "SD3F", 4) == 0) {rc = SUBSCRIBE_ERROR;}
-				else if(strncmp(rw_buf, "SD4F", 4) == 0) {rc = SUBSCRIBE_TIMEOUT;}
-				else if(strncmp(rw_buf, "SD5F", 4) == 0) {rc = PUBLISH_ERROR;}
-				else if(strncmp(rw_buf, "SD6F", 4) == 0) {rc = PUBLISH_TIMEOUT;}
-				else if(strncmp(rw_buf, "SDFF", 4) == 0) {rc = SHADOW_DELETE_GENERIC_ERROR;}
+				if(strncmp_P(rw_buf, PSTR("SD1F"), 4) == 0) {rc = NO_SHADOW_INIT_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SD2F"), 4) == 0) {rc = WRONG_PARAMETER_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SD3F"), 4) == 0) {rc = SUBSCRIBE_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SD4F"), 4) == 0) {rc = SUBSCRIBE_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SD5F"), 4) == 0) {rc = PUBLISH_ERROR;}
+				else if(strncmp_P(rw_buf, PSTR("SD6F"), 4) == 0) {rc = PUBLISH_TIMEOUT;}
+				else if(strncmp_P(rw_buf, PSTR("SD7F"), 4) == 0) {rc = PUBLISH_QUEUE_FULL;}
+				else if(strncmp_P(rw_buf, PSTR("SD8F"), 4) == 0) {rc = PUBLISH_QUEUE_DISABLED;}
+				else if(strncmp_P(rw_buf, PSTR("SDFF"), 4) == 0) {rc = SHADOW_DELETE_GENERIC_ERROR;}
 				else rc = GENERIC_ERROR;
 			}
 		}
@@ -721,47 +734,47 @@ IoT_Error_t aws_iot_mqtt_client::getJSONValueLoop(const char* JSONIdentifier, co
 
 		exec_cmd("j\n", false, false);
 		
-		sprintf(rw_buf, "%s\n", JSONIdentifier);
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), JSONIdentifier);
 		exec_cmd(rw_buf, false, false);
 
 		switch(accessType) {
 			case DESIRED_SECTION:
-				sprintf(rw_buf, "state\"desired\"%s\n", key);
+				snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("state\"desired\"%s\n"), key);
 				break;
 			case REPORTED_SECTION:
-				sprintf(rw_buf, "state\"reported\"%s\n", key);
+				snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("state\"reported\"%s\n"), key);
 				break;
 			case DELTA_SECTION:
-				sprintf(rw_buf, "state\"%s\n", key);
+				snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("state\"%s\n"), key);
 				break;
 			case GENERAL_SECTION:
-				sprintf(rw_buf, "%s\n", key);
+				snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), key);
 				break;
 			default:
-				sprintf(rw_buf, "%s\n", key);
+				snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%s\n"), key);
 		}
 		exec_cmd(rw_buf, false, false);
 
 		int isFirst = chunk_cnt == 0 ? 1 : 0;
 		chunk_cnt++;
-		if(isFirst == 1) {sprintf(externalJSONBuf, "%s", "");} // Clear the external buffer
-		sprintf(rw_buf, "%d\n", isFirst);
+		if(isFirst == 1) {snprintf_P(externalJSONBuf, bufSize, PSTR("%s"), "");} // Clear the external buffer
+		snprintf_P(rw_buf, MAX_BUF_SIZE, PSTR("%d\n"), isFirst);
 		exec_cmd(rw_buf, true, false);
 
-		if(strncmp(rw_buf, "J0F", 3) == 0) {break;} // End of JSON value string transmission
-		else if(strncmp(rw_buf, "J1F", 3) == 0) {
+		if(strncmp_P(rw_buf, PSTR("J0F"), 3) == 0) {break;} // End of JSON value string transmission
+		else if(strncmp_P(rw_buf, PSTR("J1F"), 3) == 0) {
 			rc = NO_SET_UP_ERROR;
 			break;
 		}
-		else if(strncmp(rw_buf, "J2F", 3) == 0) {
+		else if(strncmp_P(rw_buf, PSTR("J2F"), 3) == 0) {
 			rc = JSON_FILE_NOT_FOUND;
 			break;
 		}
-		else if(strncmp(rw_buf, "J3F", 3) == 0) {
+		else if(strncmp_P(rw_buf, PSTR("J3F"), 3) == 0) {
 			rc = JSON_KEY_NOT_FOUND;
 			break;
 		}
-		else if(strncmp(rw_buf, "JFF", 3) == 0) {
+		else if(strncmp_P(rw_buf, PSTR("JFF"), 3) == 0) {
 			rc = JSON_GENERIC_ERROR;
 			break;
 		}
@@ -866,7 +879,8 @@ bool aws_iot_mqtt_client::is_num(char* src) {
 	else {
 		char* p = src;
 		while(*p != '\0') {
-			if(*p > '9' || *p < '0') {
+			int currentCheck = (int)(*p);
+			if(!isdigit(currentCheck)) {
 				rc = false;
 				break;
 			}

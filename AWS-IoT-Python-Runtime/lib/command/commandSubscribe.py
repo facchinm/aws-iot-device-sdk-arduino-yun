@@ -15,25 +15,21 @@
  */
  '''
 
-import sys
-sys.path.append("../lib/exception/")
 import AWSIoTCommand
-from AWSIoTExceptions import subscribeError
-from AWSIoTExceptions import subscribeTimeoutException
+from core.exception.AWSIoTExceptions import subscribeError
+from core.exception.AWSIoTExceptions import subscribeTimeoutException
 
 
 class commandSubscribe(AWSIoTCommand.AWSIoTCommand):
-    # Target API: mqttCore.subscribe(topic, qos, callback)
+    # Target API: AWSIoTMQTTClient.subscribe(topic, qos, callback)
     # Parameter list: <topic> <qos> <ino_id> <mqttSubscribeUnit>
-    _mqttCoreHandler = None
-    _mqttSubscribeUnit = None
-    _mqttSubscribeTable = None
 
     def __init__(self, srcParameterList, srcSerialCommuteServer, srcMQTTCore, srcMQTTSubscribeTable):
         self._commandProtocolName = "s"
         self._parameterList = srcParameterList
         self._serialCommServerHandler = srcSerialCommuteServer
         self._mqttCoreHandler = srcMQTTCore
+        self._mqttSubscribeUnit = None
         self._mqttSubscribeTable = srcMQTTSubscribeTable
         self._desiredNumberOfParameters = 4
 

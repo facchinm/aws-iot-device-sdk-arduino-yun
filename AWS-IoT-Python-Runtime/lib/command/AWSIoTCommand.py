@@ -17,15 +17,13 @@
 
 
 class AWSIoTCommand:
-    _commandProtocolName = None
-    _parameterList = None
-    _serialCommServerHandler = None
-    _desiredNumberOfParameters = 0
-    _initSuccess = True
 
     def __init__(self, srcCommandProtocolName="x"):
         self._commandProtocolName = srcCommandProtocolName
         self._parameterList = []
+        self._serialCommServerHandler = None
+        self._desiredNumberOfParameters = 0
+        self._initSuccess = True
 
     def _validateCommand(self):
         if self._parameterList is None:

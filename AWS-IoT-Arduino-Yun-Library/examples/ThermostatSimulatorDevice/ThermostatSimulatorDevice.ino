@@ -29,18 +29,23 @@ bool success_connect = false;
 bool print_log(const char* src, int code) {
   bool ret = true;
   if(code == 0) {
-    Serial.print("[LOG] command: ");
-    Serial.print(src);
-    Serial.println(" completed.");
+    #ifdef AWS_IOT_DEBUG
+      Serial.print(F("[LOG] command: "));
+      Serial.print(src);
+      Serial.println(F(" completed."));
+    #endif
     ret = true;
   }
   else {
-    Serial.print("[ERR] command: ");
-    Serial.print(src);
-    Serial.print(" code: ");
-    Serial.println(code);
+    #ifdef AWS_IOT_DEBUG
+      Serial.print(F("[ERR] command: "));
+      Serial.print(src);
+      Serial.print(F(" code: "));
+      Serial.println(code);
+    #endif
     ret = false;
   }
+  Serial.flush();
   return ret;
 }
 
@@ -57,7 +62,7 @@ void setup() {
   while(!Serial);
 
   char curr_version[80];
-  sprintf(curr_version, "AWS IoT SDK Version(dev) %d.%d.%d-%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
+  snprintf_P(curr_version, 80, PSTR("AWS IoT SDK Version(dev) %d.%d.%d-%s\n"), VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
   Serial.println(curr_version);
 
   if(print_log("setup", myClient.setup(AWS_IOT_CLIENT_ID))) {
@@ -79,7 +84,7 @@ void loop() {
     else if(reportedTemp - desiredTemp > 0.001) {reportedTemp -= 0.1;}
     dtostrf(reportedTemp, 4, 1, float_buf);
     float_buf[4] = '\0';
-    sprintf(JSON_buf, "{\"state\":{\"reported\":{\"Temp\":%s}}}", float_buf);
+    sprintf_P(JSON_buf, PSTR("{\"state\":{\"reported\":{\"Temp\":%s}}}"), float_buf);
     print_log("shadow update", myClient.shadow_update(AWS_IOT_MY_THING_NAME, JSON_buf, strlen(JSON_buf), NULL, 5));
     if(myClient.yield()) {
       Serial.println("Yield failed.");
