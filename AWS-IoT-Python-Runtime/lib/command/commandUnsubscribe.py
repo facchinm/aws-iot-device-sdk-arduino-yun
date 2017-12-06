@@ -16,9 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import unsubscribeError
-from core.exception.AWSIoTExceptions import unsubscribeTimeoutException
-
 
 class commandUnsubscribe(AWSIoTCommand.AWSIoTCommand):
     # Target API: AWSIoTMQTTClient.unsubscribe(topic)
@@ -52,10 +49,6 @@ class commandUnsubscribe(AWSIoTCommand.AWSIoTCommand):
                 pass  # Ignore unsubscribe to a topic that never been subscribed
             except TypeError as e:
                 returnMessage = "U2F: " + str(e.message)
-            except unsubscribeError as e:
-                returnMessage = "U3F: " + str(e.message)
-            except unsubscribeTimeoutException as e:
-                returnMessage = "U4F: " + str(e.message)
             except Exception as e:
                 returnMessage = "UFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

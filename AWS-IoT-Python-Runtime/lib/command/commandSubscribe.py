@@ -16,9 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import subscribeError
-from core.exception.AWSIoTExceptions import subscribeTimeoutException
-
 
 class commandSubscribe(AWSIoTCommand.AWSIoTCommand):
     # Target API: AWSIoTMQTTClient.subscribe(topic, qos, callback)
@@ -54,10 +51,6 @@ class commandSubscribe(AWSIoTCommand.AWSIoTCommand):
                 self._mqttSubscribeTable[self._parameterList[0]] = self._mqttSubscribeUnit
             except TypeError as e:
                 returnMessage = "S2F: " + str(e.message)
-            except subscribeError as e:
-                returnMessage = "S3F: " + str(e.message)
-            except subscribeTimeoutException as e:
-                returnMessage = "S4F: " + str(e.message)
             except Exception as e:
                 returnMessage = "SFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

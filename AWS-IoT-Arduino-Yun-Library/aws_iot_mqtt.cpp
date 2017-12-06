@@ -34,7 +34,7 @@ PGM_P OUT_OF_BUFFER_ERR_MSG = "OUT OF BUFFER SIZE";
 PGM_P EMPTY_STRING = "";
 // Internal non-protocol commands
 PGM_P CMD_CHECK_LINUX_LIVE = "uname\n";
-PGM_P CMD_CD_TO_PY_RUNTIME = "cd /root/AWS-IoT-Python-Runtime/runtime/\n";
+PGM_P CMD_CD_TO_PY_RUNTIME = "cd /usr/lib/python2.7/AWS-IoT-Python-Runtime/runtime/\n";
 PGM_P CMD_START_PY_RUNTIME = "python run.py\n";
 
 // Choose different baudrate for different version of openWRT OS

@@ -16,9 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import subscribeError
-from core.exception.AWSIoTExceptions import subscribeTimeoutException
-
 
 class commandShadowRegisterDeltaCallback(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowRegisterDeltaCallback(srcCallback)
@@ -55,11 +52,6 @@ class commandShadowRegisterDeltaCallback(AWSIoTCommand.AWSIoTCommand):
                 self._shadowSubscribeRecord[self._parameterList[0]] = int(self._parameterList[1])
             except TypeError as e:
                 returnMessage = "S_RD2F: " + str(e.message)
-            # One subscription
-            except subscribeError as e:
-                returnMessage = "S_RD3F: " + str(e.message)
-            except subscribeTimeoutException as e:
-                returnMessage = "S_RD4F: " + str(e.message)
             except Exception as e:
                 returnMessage = "S_RDFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

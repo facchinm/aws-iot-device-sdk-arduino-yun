@@ -16,9 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import disconnectError
-from core.exception.AWSIoTExceptions import disconnectTimeoutException
-
 
 class commandDisconnect(AWSIoTCommand.AWSIoTCommand):
     # Target API: AWSIoTMQTTShadowClient.disconnect()
@@ -41,10 +38,6 @@ class commandDisconnect(AWSIoTCommand.AWSIoTCommand):
         else:
             try:
                 self._shadowClientHandler.disconnect()
-            except disconnectError as e:
-                returnMessage = "D2F: " + str(e.message)
-            except disconnectTimeoutException as e:
-                returnMessage = "D3F: " + str(e.message)
             except Exception as e:
                 returnMessage = "DFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

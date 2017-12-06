@@ -16,13 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import subscribeError
-from core.exception.AWSIoTExceptions import subscribeTimeoutException
-from core.exception.AWSIoTExceptions import publishError
-from core.exception.AWSIoTExceptions import publishTimeoutException
-from core.exception.AWSIoTExceptions import publishQueueFullException
-from core.exception.AWSIoTExceptions import publishQueueDisabledException
-
 
 class commandShadowUpdate(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowUpdate(srcJSONPayload, srcCallback, srcTimeout)
@@ -62,19 +55,6 @@ class commandShadowUpdate(AWSIoTCommand.AWSIoTCommand):
                 returnMessage = "SU2F: " + str(e.message)
             except ValueError as e:
                 returnMessage = "SU3F: " + "Invalid JSON payload."
-            # 2 subscriptions and 1 publish
-            except subscribeError as e:
-                returnMessage = "SU4F: " + str(e.message)
-            except subscribeTimeoutException as e:
-                returnMessage = "SU5F: " + str(e.message)
-            except publishError as e:
-                returnMessage = "SU6F: " + str(e.message)
-            except publishTimeoutException as e:
-                returnMessage = "SU7F: " + str(e.message)
-            except publishQueueFullException as e:
-                returnMessage = "SU8F: " + str(e.message)
-            except publishQueueDisabledException as e:
-                returnMessage = "SU9F: " + str(e.message)
             except Exception as e:
                 returnMessage = "SUFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

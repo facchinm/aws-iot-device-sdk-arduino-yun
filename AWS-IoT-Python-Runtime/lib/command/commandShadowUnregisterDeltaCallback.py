@@ -16,9 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import unsubscribeError
-from core.exception.AWSIoTExceptions import unsubscribeTimeoutException
-
 
 class commandShadowUnregisterDeltaCallback(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowUnregisterDeltaCallback()
@@ -56,11 +53,6 @@ class commandShadowUnregisterDeltaCallback(AWSIoTCommand.AWSIoTCommand):
                 del self._shadowSubscribeRecord[self._parameterList[0]]
             except TypeError as e:
                 returnMessage = "S_UD2F: " + str(e.message)
-            # One unsubscription
-            except unsubscribeError as e:
-                returnMessage = "S_UD3F: " + str(e.message)
-            except unsubscribeTimeoutException as e:
-                returnMessage = "S_UD4F: " + str(e.message)
             except Exception as e:
                 returnMessage = "S_UDFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)

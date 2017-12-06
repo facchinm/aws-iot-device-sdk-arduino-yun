@@ -17,9 +17,6 @@
 
 import AWSIoTCommand
 from ssl import SSLError
-from core.exception.AWSIoTExceptions import connectError
-from core.exception.AWSIoTExceptions import connectTimeoutException
-
 
 class commandConnect(AWSIoTCommand.AWSIoTCommand):
     # Target API: AWSIoTMQTTShadowClient.connect(keepAliveInterval)
@@ -46,10 +43,6 @@ class commandConnect(AWSIoTCommand.AWSIoTCommand):
                 returnMessage = "C2F: " + str(e.message)
             except SSLError as e:
                 returnMessage = "C3F: " + "Mutual Auth issues."
-            except connectError as e:
-                returnMessage = "C4F: " + str(e.message)
-            except connectTimeoutException as e:
-                returnMessage = "C5F: " + str(e.message)
             except IOError as e:
                 returnMessage = "C6F: " + "Credentials not found."
             except ValueError as e:

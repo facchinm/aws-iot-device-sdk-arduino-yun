@@ -16,13 +16,6 @@
  '''
 
 import AWSIoTCommand
-from core.exception.AWSIoTExceptions import subscribeError
-from core.exception.AWSIoTExceptions import subscribeTimeoutException
-from core.exception.AWSIoTExceptions import publishError
-from core.exception.AWSIoTExceptions import publishTimeoutException
-from core.exception.AWSIoTExceptions import publishQueueFullException
-from core.exception.AWSIoTExceptions import publishQueueDisabledException
-
 
 class commandShadowDelete(AWSIoTCommand.AWSIoTCommand):
     # Target API: deviceShadow.shadowDelete(srcCallback, srcTimeout)
@@ -60,19 +53,6 @@ class commandShadowDelete(AWSIoTCommand.AWSIoTCommand):
                 # A waiting will be performed in the callback to wait until the data structure is ready for device shadow name registration
             except TypeError as e:
                 returnMessage = "SD2F: " + str(e.message)
-            # 2 subscriptions and 1 publish
-            except subscribeError as e:
-                returnMessage = "SD3F: " + str(e.message)
-            except subscribeTimeoutException as e:
-                returnMessage = "SD4F: " + str(e.message)
-            except publishError as e:
-                returnMessage = "SD5F: " + str(e.message)
-            except publishTimeoutException as e:
-                returnMessage = "SD6F: " + str(e.message)
-            except publishQueueFullException as e:
-                returnMessage = "SD7F: " + str(e.message)
-            except publishQueueDisabledException as e:
-                returnMessage = "SD8F: " + str(e.message)
             except Exception as e:
                 returnMessage = "SDFF: " + "Unknown error."
         self._serialCommServerHandler.writeToInternalProtocol(returnMessage)
