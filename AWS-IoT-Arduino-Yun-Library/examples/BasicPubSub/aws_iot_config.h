@@ -27,7 +27,7 @@
 #define AWS_IOT_PRIVATE_KEY_FILENAME "privkey.pem"              // your private key filename
 //===============================================================
 // SDK config, DO NOT modify it
-#define AWS_IOT_PATH_PREFIX "/www/arduino/data/"
+#define AWS_IOT_PATH_PREFIX "/www/sd/BasicPubSub/"
 #define AWS_IOT_ROOT_CA_PATH AWS_IOT_PATH_PREFIX AWS_IOT_ROOT_CA_FILENAME			// use this in config call
 #define AWS_IOT_CERTIFICATE_PATH AWS_IOT_PATH_PREFIX AWS_IOT_CERTIFICATE_FILENAME	// use this in config call
 #define AWS_IOT_PRIVATE_KEY_PATH AWS_IOT_PATH_PREFIX AWS_IOT_PRIVATE_KEY_FILENAME	// use this in config call
